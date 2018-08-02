@@ -1,5 +1,6 @@
 package com.ar6.ng7m;
 
+import net.sourceforge.argparse4j.ArgumentParserBuilder;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -7,15 +8,16 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 public class FCCULSDataCleaner
 {
 	// external library objects
-	private static ArgumentParser	_argsParser = null;
-	
+	private static ArgumentParserBuilder _argsParserBuilder = null;
+	private static ArgumentParser _argsParser = null;
+
 	// local project objects
 	private static CmdLineArgs _cmdLineArgs = null;
 	private static AmatCleaner _amatCleaner = null;
 	
     public static void main(String[] args)
     {
-		int	nExitValue = 0;
+		int	nExitValue;
     	try
     	{
 	    	// parse the commandline args
@@ -67,11 +69,14 @@ public class FCCULSDataCleaner
     private static ArgumentParser getARGSParser()
     {
     	// setup instantiate singleton argument parser
-    	if (_argsParser == null)
+    	if (_argsParserBuilder == null)
     	{
     		String className = Thread.currentThread().getStackTrace()[1].getClassName();
-    		_argsParser = ArgumentParsers.newArgumentParser(className)
-		        .description("Validates / Cleans and re-creates FCC ULS license amateur data for import by AR-Cluster version 6 by AB5K.");
+
+    		_argsParserBuilder = ArgumentParsers.newFor(className);
+    		_argsParser = _argsParserBuilder.build();
+
+		     _argsParser.description("Validates / Cleans and re-creates FCC ULS license amateur data for import by AR-Cluster version 6 by AB5K.");
 
 			_argsParser.addArgument("-r")
 					.type(Boolean.class).setDefault(Boolean.FALSE)
