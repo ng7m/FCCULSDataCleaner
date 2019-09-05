@@ -284,7 +284,7 @@ public class AmatCleaner
 		if(0 != fieldsPerRecord)
 		{
 			// check field count
-			fieldsOK = (fields.length == fieldsPerRecord);
+			fieldsOK = (fields.length >= fieldsPerRecord);
 
 			if(!fieldsOK)
 			{
@@ -305,7 +305,16 @@ public class AmatCleaner
 						{
 							out("Invalid field length found in Field#: " + x + " Value = " + fields[x] + " Max Length: " + fieldLengths[x] + " Actual Length: " + fields[x].length());
 						}
-						fieldsOK = false;
+
+						// trim to expected size
+						fields[x] = fields[x].substring(0,fieldLengths[x]);
+
+						if(verboseOutput)
+						{
+							out("Field length trimmed to documented length of: " + fieldLengths[x] + " New field value: " + fields[x]);
+						}
+
+						fieldsOK = true;
 						break;
 					}
 				}
