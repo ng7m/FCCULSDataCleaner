@@ -1,10 +1,10 @@
 package com.ar6.ng7m;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -17,9 +17,12 @@ import java.net.URL;
 
 public class Downloader
 {
-    public File download(URL url, File dstFile)
+    public File httpDownload(URL url, File dstFile)
     {
-        CloseableHttpClient httpclient = HttpClients.custom().setRedirectStrategy(new LaxRedirectStrategy()).build();
+        CloseableHttpClient httpclient = HttpClients.custom()
+                .setDefaultRequestConfig(RequestConfig.custom()
+                .setCookieSpec(CookieSpecs.STANDARD).build())
+                .setRedirectStrategy(new LaxRedirectStrategy()).build();
 
         try
         {
@@ -31,6 +34,24 @@ public class Downloader
         {
             throw new IllegalStateException(e);
         }
+    }
+
+    public boolean FTPDownload(URL url, String localFile)
+    {
+        boolean isSuccessful;
+
+        try
+        {
+            FTPDownloader ftpDownloader = new FTPDownloader(url.getHost(),"anonymous","anonymous");
+
+            isSuccessful = ftpDownloader.downloadFile(url.getPath(), localFile );
+        }
+        catch (Exception e)
+        {
+            throw new IllegalStateException(e);
+        }
+
+        return isSuccessful;
     }
 
     static class FileDownloadResponseHandler implements ResponseHandler<File>

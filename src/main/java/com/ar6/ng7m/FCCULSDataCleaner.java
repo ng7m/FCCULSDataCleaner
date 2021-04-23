@@ -99,7 +99,7 @@ public class FCCULSDataCleaner
 					.help("Download FCC ULS Data using -fccAmURL URL Specified.");
 
 			_argsParser.addArgument("-fccAmURL")
-					.type(String.class).setDefault("http://wireless.fcc.gov/uls/data/complete/l_amat.zip")
+					.type(String.class).setDefault("ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip")
 					.help("FCC URL to ULS Amateur Complete Zipped Data Download:");
 
 			_argsParser.addArgument("-o")

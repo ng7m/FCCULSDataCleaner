@@ -500,7 +500,12 @@ public class AmatCleaner
 		try
 		{
 			Downloader downloader = new Downloader();
-			downloader.download(new URL(url), new File(file));
+
+			// the FCC stopped hosting files via http sometime before April of 2021
+			//downloader.httpDownload(new URL(url), new File(file));
+
+			downloader.FTPDownload(new URL(url), file);
+
 			bSuccess = true;
 		}
 		catch (UnsupportedOperationException e)
