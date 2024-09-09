@@ -106,8 +106,9 @@ public class FCCULSDataCleaner
 					.type(String.class).setDefault("")
 					.help("Output Directory for new zip file. Uses Temp Location if not specified.");
 
-			_argsParser.addArgument("-wd").nargs("+").setDefault(new String[]{""})
-					.help("Original FCC ULS file(s) or working directory for -fccAmURL download.");
+			_argsParser.addArgument("-wd")
+					.type(String.class).setDefault("")
+					.help("Working directory for -fccAmURL download.");
 
 		}
     	return _argsParser;

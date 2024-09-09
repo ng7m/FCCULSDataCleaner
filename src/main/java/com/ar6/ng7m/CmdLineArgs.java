@@ -12,13 +12,13 @@ public class CmdLineArgs
     public boolean readOnly;
 
 	@Arg(dest = "o")
-    private String outputDestination;
+    private String outputDestination="";
     public String GetOutputDestination()
     {
 		// if output path is a blank string (the default), then use OS level temp path and
 		// create a directory below the temp path
 
-		if (0 == outputDestination.length())
+		if (outputDestination.isEmpty())
 		{
 			// Get the temporary directory and print it.
 			String tempDir = System.getProperty("java.io.tmpdir");
@@ -79,30 +79,25 @@ public class CmdLineArgs
 	}
 
 	@Arg(dest = "wd")
-	private String workingDirOrFiles[];
+	private String workingDirectory;
 
-	public String[] GetWorkingDirOrFiles()
+	public String GetWorkingDirectory()
 	{
-		if (null != workingDirOrFiles)
+		// default to a working direct / temp OS path
+		if (workingDirectory.isEmpty())
 		{
-			// default to a working direct / temp OS path
-			if (0 == workingDirOrFiles[0].length())
-			{
-				// Get the temporary directory and print it.
-				String tempDir = System.getProperty("java.io.tmpdir");
+			// Get the temporary directory and print it.
+			String tempDir = System.getProperty("java.io.tmpdir");
 
-				Path filePath = Paths.get(tempDir, "FCCULSDataCleaner/temp");
-				workingDirOrFiles[0] = filePath.toString();
+			Path filePath = Paths.get(tempDir, "FCCULSDataCleaner/temp");
+			workingDirectory = filePath.toString();
 
-                System.out.println("Using OS Temp File Path as working Directory: " + workingDirOrFiles[0]);
-			}
+			System.out.println("Using OS Temp File Path as working Directory: " + workingDirectory);
 		}
 
-		return workingDirOrFiles;
-	}
-	public void SetWorkingDirOrFiles(String[] _workingDirOrFiles)
-	{
-		workingDirOrFiles = _workingDirOrFiles;
+		ValidateOrCreateDirectory(workingDirectory);
+
+		return workingDirectory;
 	}
 
 }

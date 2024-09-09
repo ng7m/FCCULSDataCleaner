@@ -13,6 +13,7 @@ import org.apache.http.impl.client.LaxRedirectStrategy;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 
 public class Downloader
@@ -36,15 +37,15 @@ public class Downloader
         }
     }
 
-    public boolean FTPDownload(URL url, String localFile)
+    public boolean FTPDownload(URI uri, String localFile)
     {
         boolean isSuccessful;
 
         try
         {
-            FTPDownloader ftpDownloader = new FTPDownloader(url.getHost(),"anonymous","anonymous");
+            FTPDownloader ftpDownloader = new FTPDownloader(uri.getHost(),"anonymous","anonymous");
 
-            isSuccessful = ftpDownloader.downloadFile(url.getPath(), localFile );
+            isSuccessful = ftpDownloader.downloadFile(uri.getPath(), localFile );
         }
         catch (Exception e)
         {

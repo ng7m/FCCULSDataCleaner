@@ -3,7 +3,8 @@ package com.ar6.ng7m;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,7 +24,7 @@ public class AmatCleaner
 	// local project objects
 	private CmdLineArgs _cmdLineArgs = null;
 	final private String _generationTimeStamp = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss").format(Calendar.getInstance().getTime());
-	private static Pattern asciiPattern = Pattern.compile("[^\\p{ASCII}]");
+	private static final Pattern asciiPattern = Pattern.compile("[^\\p{ASCII}]");
 
 
 	public boolean Execute()
@@ -33,6 +34,8 @@ public class AmatCleaner
 		CmdLineArgs argumentValues = getConfiguration();
 		String outputDestinationPath = argumentValues.GetOutputDestination();
 		File outputDirectory = outputDirectoryIsValid(outputDestinationPath);
+		String workingDirectoryPath = argumentValues.GetWorkingDirectory();
+		workingDirectoryIsValid(workingDirectoryPath);
 
 		if(null != outputDirectory)
 		{
@@ -53,70 +56,72 @@ public class AmatCleaner
 			// get the fcc uls complete zip data
 			if(argumentValues.downloadFccZip)
 			{
-				Path filePath = Paths.get(argumentValues.GetWorkingDirOrFiles()[0], argumentValues.GetZipFileName());
+				String zipFileName = argumentValues.GetZipFileName();
+
+				// create the temp working directory if needed
+
+				Path filePath = Paths.get(workingDirectoryPath, zipFileName);
+
                 // reach out and download the file, make sure and set proxy jvm properties if
-                // running from a NAT based network
+                // running from a NAT based network, user must set env var proxy variables
                 out("Downloading: " + argumentValues.fccAmatuerLicenseCompleteURL);
-                out("Be Patient! File may be 130+ megs in size...");
+                out("Be Patient! File is over 100 megs...");
 
                 if (CopyURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString()))
                 {
                     // if we made it here, we have a zip file that needs to be extracted
-                    unZipFile(argumentValues.GetWorkingDirOrFiles()[0], argumentValues.GetZipFileName());
+                    unZipFile(workingDirectoryPath, zipFileName);
 
                     bSuccessful = true;
                 }
 			}
+			else
+			{
+				// show success to reuse already downloaded files for testing
+				bSuccessful = true;
+			}
 			if(bSuccessful)
 			{
-				String[] workingDirOrFiles = argumentValues.GetWorkingDirOrFiles();
+				String workingDir = argumentValues.GetWorkingDirectory();
 				out("Begin File Processing...");
-				for(int x = 0; x < workingDirOrFiles.length; x++)
+					File datFile = new File(workingDir);
+
+				if(datFile.isDirectory())
 				{
-					File datFile = new File(workingDirOrFiles[x]);
-
-					if(datFile.isDirectory())
+					// copy everything to destination
+					try
 					{
-						// copy everything to destination
-						try
+						if(!argumentValues.readOnly)
 						{
-							if(!argumentValues.readOnly)
-							{
-								out("Copying source directory to output directory...");
-								FileUtils.copyDirectory(datFile, outputDirectory);
-							}
-						} catch(IOException e)
-						{
-							out("Error: " + e.getCause());
+							out("Copying source directory to output directory...");
+							FileUtils.copyDirectory(datFile, outputDirectory);
 						}
-
-						FilenameFilter filter = new FilenameFilter()
-						{
-							@Override
-							public boolean accept(File dir, String name)
-							{
-								return name.toLowerCase().endsWith(".dat");
-							}
-						};
-
-						File[] filesInDir = datFile.listFiles(filter);
-
-						for(File file : filesInDir)
-						{
-							parse(file.getAbsolutePath(), file.getName(), outputDestinationPath);
-						}
-
-						if(argumentValues.createOutputZipFile)
-						{
-							Path path = Paths.get(outputDestinationPath, argumentValues.GetZipFileName());
-
-							createZipFile(outputDestinationPath, path.toAbsolutePath().toString());
-						}
+					} catch(IOException e)
+					{
+						out("Error: " + e.getCause());
 					}
-					else
+
+					FilenameFilter filter = new FilenameFilter()
 					{
-						out("Processing: " + workingDirOrFiles[x]);
-						parse(datFile.getAbsolutePath(), datFile.getName(), outputDestinationPath);
+						@Override
+						public boolean accept(File dir, String name)
+						{
+							return name.toLowerCase().endsWith(".dat");
+						}
+					};
+
+					File[] filesInDir = datFile.listFiles(filter);
+
+					for(File file : filesInDir)
+					{
+						parse(file.getAbsolutePath(), file.getName(), outputDestinationPath);
+					}
+
+					if(argumentValues.createOutputZipFile)
+					{
+						Path path = Paths.get(outputDestinationPath, argumentValues.GetZipFileName());
+
+						createZipFile(outputDestinationPath, path.toAbsolutePath().toString());
 					}
 				}
 				out("Finished Processing...");
@@ -472,6 +477,34 @@ public class AmatCleaner
 		return file;
 	}
 
+	private File workingDirectoryIsValid(String workingDestinationPath)
+	{
+		boolean bReturn = false;
+		File file = null;
+
+		if(workingDestinationPath == null)
+		{
+			out("Missing Working Destination Path.");
+		}
+		else
+		{
+			file = new File(workingDestinationPath);
+
+			if(file.isDirectory() && file.canWrite())
+			{
+				out("Working Path Valid: " + file.getAbsolutePath());
+				bReturn = true;
+			}
+			else
+			{
+				file = null;
+				out("Invalid working directory!");
+			}
+		}
+
+		return file;
+	}
+
 
 	public void setConfiguration(CmdLineArgs cmdLineArgs)
 	{
@@ -492,7 +525,7 @@ public class AmatCleaner
 		System.out.println(str);
 	}
 
-	boolean CopyURLtoFile(String url, String file)
+	boolean CopyURLtoFile(String uri, String file)
 	{
 		boolean bSuccess = false;
 		String exceptionCause = "";
@@ -501,24 +534,15 @@ public class AmatCleaner
 		{
 			Downloader downloader = new Downloader();
 
-			// the FCC stopped hosting files via http sometime before April of 2021
-			//downloader.httpDownload(new URL(url), new File(file));
-
-			downloader.FTPDownload(new URL(url), file);
-
-			bSuccess = true;
+			bSuccess = downloader.FTPDownload(new URI(uri), file);
 		}
-		catch (UnsupportedOperationException e)
+		catch (UnsupportedOperationException | URISyntaxException e)
 		{
 			exceptionCause = e.getCause().toString();
 		}
-		catch (IOException e)
+        if (!bSuccess)
 		{
-			exceptionCause = e.getCause().toString();
-		}
-		if (!bSuccess)
-		{
-			out("URL: " + url + " to File: " + file + " failed!" + exceptionCause);
+			out("URL: " + uri + " to File: " + file + " failed!" + exceptionCause);
 		}
 		return bSuccess;
 	}
