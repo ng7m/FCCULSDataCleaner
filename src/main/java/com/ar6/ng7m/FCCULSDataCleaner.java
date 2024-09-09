@@ -110,6 +110,10 @@ public class FCCULSDataCleaner
 					.type(String.class).setDefault("")
 					.help("Working directory for -fccAmURL download.");
 
+			_argsParser.addArgument("-n1mmch")
+					.type(Boolean.class).setDefault(Boolean.FALSE)
+					.help("Create N1MM Call History File.");
+
 		}
     	return _argsParser;
     }

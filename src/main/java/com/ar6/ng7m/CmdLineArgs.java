@@ -79,8 +79,7 @@ public class CmdLineArgs
 	}
 
 	@Arg(dest = "wd")
-	private String workingDirectory;
-
+	private String workingDirectory="";
 	public String GetWorkingDirectory()
 	{
 		// default to a working direct / temp OS path
@@ -99,5 +98,8 @@ public class CmdLineArgs
 
 		return workingDirectory;
 	}
+
+	@Arg(dest = "n1mmch")
+	public boolean createN1MMCallHistory;
 
 }
