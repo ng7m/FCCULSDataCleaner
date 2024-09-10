@@ -21,17 +21,25 @@ public class FCCULSDataCleaner
     	try
     	{
 	    	// parse the commandline args
-	    	parseArgs(args);
+	    	boolean argsParsed = parseArgs(args);
+
+			if (argsParsed)
+			{
+				CmdLineArgs cmdLineArgs = getCmdLineArgs();
+
+				// if execution makes it here we are happy with the input args
+				AmatCleaner amatCleaner = getAmatCleaner();
+				amatCleaner.setConfiguration(cmdLineArgs);
+
+				// start the actual processing
+				nExitValue = amatCleaner.Execute() ? 0 : 1;
+			}
+			else
+			{
+				nExitValue = 0;
+			}
 	    	
-	    	CmdLineArgs cmdLineArgs = getCmdLineArgs();
-	    	
-	    	// if execution makes it here we are happy with the input args
-	    	AmatCleaner amatCleaner = getAmatCleaner();
-	    	
-	    	amatCleaner.setConfiguration(cmdLineArgs);
-	    	
-	    	// start the actual processing
-	    	nExitValue = amatCleaner.Execute() ? 0 : 1;
+
     	}
     	catch (Exception e)
     	{
@@ -44,8 +52,9 @@ public class FCCULSDataCleaner
     	System.exit(nExitValue);
     }	// end of main
     
-    private static void parseArgs(String [] args)
+    private static boolean parseArgs(String [] args)
     {
+		boolean bSuccess = true;
     	ArgumentParser argsParser = getARGSParser();
 		try
 		{
@@ -53,8 +62,10 @@ public class FCCULSDataCleaner
 		}
 		catch (ArgumentParserException e)
 		{
+			bSuccess = false;
 		    argsParser.handleError(e);
 		}
+		return bSuccess;
     }
  
     private static CmdLineArgs getCmdLineArgs()
@@ -98,6 +109,10 @@ public class FCCULSDataCleaner
 					.type(Boolean.class).setDefault(Boolean.TRUE)
 					.help("Download FCC ULS Data using -fccAmURL URL Specified.");
 
+			_argsParser.addArgument("-n1mmch")
+					.type(Boolean.class).setDefault(Boolean.FALSE)
+					.help("Create N1MM Call History File.");
+
 			_argsParser.addArgument("-fccAmURL")
 					.type(String.class).setDefault("ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip")
 					.help("FCC URL to ULS Amateur Complete Zipped Data Download:");
@@ -109,10 +124,6 @@ public class FCCULSDataCleaner
 			_argsParser.addArgument("-wd")
 					.type(String.class).setDefault("")
 					.help("Working directory for -fccAmURL download.");
-
-			_argsParser.addArgument("-n1mmch")
-					.type(Boolean.class).setDefault(Boolean.FALSE)
-					.help("Create N1MM Call History File.");
 
 		}
     	return _argsParser;

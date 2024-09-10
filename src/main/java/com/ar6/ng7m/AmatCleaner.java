@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -35,9 +35,9 @@ public class AmatCleaner
 		String outputDestinationPath = argumentValues.GetOutputDestination();
 		File outputDirectory = outputDirectoryIsValid(outputDestinationPath);
 		String workingDirectoryPath = argumentValues.GetWorkingDirectory();
-		workingDirectoryIsValid(workingDirectoryPath);
+		File workingDirectory = workingDirectoryIsValid(workingDirectoryPath);
 
-		if(null != outputDirectory)
+		if(!(null == outputDirectory || null == workingDirectory))
 		{
 			if(argumentValues.readOnly)
 			{
@@ -82,52 +82,63 @@ public class AmatCleaner
 			}
 			if(bSuccessful)
 			{
-				String workingDir = argumentValues.GetWorkingDirectory();
 				out("Begin File Processing...");
-					File datFile = new File(workingDir);
-
-				if(datFile.isDirectory())
-				{
-					// copy everything to destination
-					try
+					if (workingDirectory.isDirectory())
 					{
-						if(!argumentValues.readOnly)
+						// copy everything to destination
+						try
 						{
-							out("Copying source directory to output directory...");
-							FileUtils.copyDirectory(datFile, outputDirectory);
-						}
-					} catch(IOException e)
-					{
-						out("Error: " + e.getCause());
-					}
-
-					FilenameFilter filter = new FilenameFilter()
-					{
-						@Override
-						public boolean accept(File dir, String name)
+							if (!argumentValues.readOnly)
+							{
+								out("Copying source directory to output directory...");
+								FileUtils.copyDirectory(workingDirectory, outputDirectory);
+							}
+						} catch (IOException e)
 						{
-							return name.toLowerCase().endsWith(".dat");
+							out("Error: " + e.getCause());
 						}
-					};
 
-					File[] filesInDir = datFile.listFiles(filter);
+						FilenameFilter filter = new FilenameFilter()
+						{
+							@Override
+							public boolean accept(File dir, String name) {
+								return name.toLowerCase().endsWith(".dat");
+							}
+						};
 
-					for(File file : filesInDir)
-					{
-						parse(file.getAbsolutePath(), file.getName(), outputDestinationPath);
-					}
+						File[] filesInDir = workingDirectory.listFiles(filter);
 
-					if(argumentValues.createOutputZipFile)
-					{
-						Path path = Paths.get(outputDestinationPath, argumentValues.GetZipFileName());
+						// rip through the files that match the file name filter object
+						for (File file : filesInDir)
+						{
+							parse(file.getAbsolutePath(), file.getName(), outputDestinationPath);
+						}
 
-						createZipFile(outputDestinationPath, path.toAbsolutePath().toString());
+						if (argumentValues.createOutputZipFile)
+						{
+							Path path = Paths.get(outputDestinationPath, argumentValues.GetZipFileName());
+
+							createZipFile(outputDestinationPath, path.toAbsolutePath().toString());
+						}
+
+						// check to see if we need to create the N1MM call history file after files have been cleaned
+						if (argumentValues.createN1MMCallHistory)
+						{
+							// rip through the files that match the file name filter object
+							// cherry pick the ones we are
+							for (File file : filesInDir)
+							{
+								if (file.getName().equals("EN.dat"))
+								{
+									bSuccessful = CreateN1MMCallHistory(outputDestinationPath);
+								}
+							}
+						}
 					}
 				}
 				out("Finished Processing...");
 				out("Processing Completed in: " + (System.currentTimeMillis() - startTime) / 1000 + " Seconds...");
 			}
-		}
 
 		out("Successful Processing = " + bSuccessful);
 	    out("Exiting...");
@@ -161,24 +172,23 @@ public class AmatCleaner
 				writer = new BufferedWriter(new FileWriter(path.toString()));
 			}
 
-			while((record = reader.readLine()) != null)
+			if(null != writer)
 			{
-				++recordNum;
-				StringBuilder sbRecord = new StringBuilder(record);
+				while ((record = reader.readLine()) != null)
+				{
+					++recordNum;
+					StringBuilder sbRecord = new StringBuilder(record);
 
-				if(!validateFields(fileName, recordNum, sbRecord))
-				{
-					++numErrors;
-					out("Error found in record: " + recordNum + " with value: " + "\"" + record + "\"");
-				}
-				else
-				{
-					// assume record could have been cleaned up and reassign record to sbRecord
-					record = sbRecord.toString();
-					if(null != writer)
+					if (!validateFields(fileName, recordNum, sbRecord))
 					{
-						writer.write(record);
-						writer.newLine();
+						++numErrors;
+						out("Error found in record: " + recordNum + " with value: " + "\"" + record + "\"");
+					} else
+					{
+						// assume record could have been cleaned up and reassign record to sbRecord
+						record = sbRecord.toString();
+							writer.write(record);
+							writer.newLine();
 					}
 				}
 			}
@@ -217,6 +227,198 @@ public class AmatCleaner
 		out("");
 		return (numErrors > 0) ? true : false;
 	}
+
+	private boolean CreateN1MMCallHistory(String outputDestinationPath)
+	{
+		File HDdatFile = new File(Paths.get(outputDestinationPath,"HD.dat").toString());
+		File ENdatFile = new File(Paths.get(outputDestinationPath,"EN.dat").toString());
+		File AMdatFile = new File(Paths.get(outputDestinationPath,"AM.dat").toString());
+		BufferedReader reader = null;
+		BufferedWriter writer = null;
+		String fileToProcess, record;
+		String splitBy = Pattern.quote("|");
+		String headerFooter = "========================================================================================";
+		int numErrors = 0;
+		String n1mmCallHistoryFileName = "POTA_FCC_N1MM_CallHistory.txt";
+		String[] fields;
+		String uniqueSystemIdentifier, licenseStatus, licenseClass, attentionLine;
+		String callSign, firstName, state;
+		String callHistoryRecord;
+		int notActiveCount = 0;
+
+		out(headerFooter);
+		out("Processing N1MM call history creation");
+		out(headerFooter);
+
+		try
+		{
+			// see file:///C:/Users/ng7m/Downloads/public_access_database_definitions_20240215.pdf for FCC file format details
+			HashMap<String, String> hdHashMap = new HashMap<>();
+
+			out("Creating HDdat hashtable from: " + HDdatFile);
+
+			reader = new BufferedReader(new FileReader((HDdatFile)));
+			while ((record = reader.readLine()) != null)
+			{
+
+				fields = record.split(splitBy, -1);
+				uniqueSystemIdentifier = fields[1].trim();
+				callSign = fields[4].trim();
+				licenseStatus = fields[5].trim();
+
+				hdHashMap.put(uniqueSystemIdentifier, licenseStatus);
+
+			}
+
+			try
+			{
+				reader.close();
+			} catch(IOException e)
+			{
+				e.printStackTrace();
+			}
+
+			// read in the AM.dat file and create a hash table used to look up the license class
+			HashMap<String, String> amHashMap = new HashMap<>();
+			int generalClassCount = 0, advancedClassCount= 0, extranClassCount = 0, allGenAdvExtCount = 0;
+			int allOtherLicenceClasses = 0;
+
+			out("Creating AMdat hashtable from: " + AMdatFile);
+
+			reader = new BufferedReader(new FileReader((AMdatFile)));
+			while ((record = reader.readLine()) != null)
+			{
+
+				fields = record.split(splitBy, -1);
+				uniqueSystemIdentifier = fields[1].trim();
+				callSign = fields[4].trim();
+				licenseClass = fields[5].trim();
+
+				amHashMap.put(uniqueSystemIdentifier, licenseClass);
+
+			}
+
+			try
+			{
+				reader.close();
+			} catch(IOException e)
+			{
+				e.printStackTrace();
+			}
+
+			reader = new BufferedReader(new FileReader(ENdatFile));
+
+			// now make sure we can create the output file
+			Path path = Paths.get(outputDestinationPath, n1mmCallHistoryFileName);
+
+			if(!getConfiguration().readOnly)
+			{
+				writer = new BufferedWriter(new FileWriter(path.toString()));
+			}
+			if (null != writer)
+			{
+				// write out the header details (comments show what fields VE3FP is using)
+				//writer.write("!!Order!!,Call,Name,Exch1,CommentText\r\n");
+				boolean addRecord = false;
+				writer.write("!!Order!!,Call,Name,Exch1\r\n");
+				while ((record = reader.readLine()) != null)
+				{
+					fields = record.split(splitBy, -1);
+					uniqueSystemIdentifier = fields[1].trim();
+					callSign = fields[4].trim();
+					firstName = fields[8].trim();
+					state = fields[17].trim();
+					attentionLine = fields[20].trim(); // used to get a name for club calls
+
+					// check license status from the HD.had hash map and only continue if 'A' Active status
+					licenseStatus = hdHashMap.get(uniqueSystemIdentifier);
+
+					if (licenseStatus.equals("A"))
+					{
+
+						// check amHashMap to see if we have a general, advanced or extra class license
+						licenseClass = amHashMap.get(uniqueSystemIdentifier);
+
+						if (null != licenseClass)
+						{
+							switch (licenseClass)
+							{
+								case "G":
+									generalClassCount++;
+									addRecord = true;
+									break;
+								case "A":
+									advancedClassCount++;
+									addRecord = true;
+									break;
+								case "E":
+									extranClassCount++;
+									addRecord = true;
+									break;
+								case "":  // club calls?  Get the name from attentionLine
+									// set first name to the first name grabbed from attentionLine
+									if (attentionLine.indexOf(" ") > 0)
+									{
+										firstName = attentionLine.substring(0, attentionLine.indexOf(" "));
+									}
+									addRecord = true;
+									break;
+								default:
+									allOtherLicenceClasses++;
+									addRecord = false;
+							}
+
+							allGenAdvExtCount = generalClassCount + advancedClassCount + extranClassCount;
+
+							if (addRecord)
+							{
+								callHistoryRecord = callSign + ',' + firstName + ',' + state + '\r' + '\n';
+								writer.write(callHistoryRecord);
+							}
+						}
+					}
+					else
+					{
+						notActiveCount++;
+					}
+				} // while ripping through EN.dat records
+			}
+		} catch(FileNotFoundException e)
+		{
+			e.printStackTrace();
+		} catch(IOException e)
+		{
+			e.printStackTrace();
+		} finally
+		{
+			if(reader != null)
+			{
+				try
+				{
+					reader.close();
+				} catch(IOException e)
+				{
+					e.printStackTrace();
+				}
+			}
+			if(writer != null)
+			{
+				try
+				{
+					writer.close();
+				} catch(IOException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+
+		//out("File : " + absoluteFile + " Finished Processing with: " + recordNum + " rows. Records removed due to errors: " + numErrors);
+		out(headerFooter);
+		out("");
+		return (numErrors > 0) ? true : false;
+	}
+
 
 	private boolean validateFields(String fileName, int recordNum, StringBuilder sbRecord)
 	{

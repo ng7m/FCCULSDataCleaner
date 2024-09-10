@@ -71,6 +71,9 @@ public class CmdLineArgs
 	@Arg(dest = "z")
 	public boolean createOutputZipFile;
 
+	@Arg(dest = "n1mmch")
+	public boolean createN1MMCallHistory;
+
 	@Arg(dest = "zf")
 	private String zipFileName;
 	String GetZipFileName()
@@ -98,8 +101,5 @@ public class CmdLineArgs
 
 		return workingDirectory;
 	}
-
-	@Arg(dest = "n1mmch")
-	public boolean createN1MMCallHistory;
 
 }
