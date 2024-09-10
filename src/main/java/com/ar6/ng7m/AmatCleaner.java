@@ -9,6 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -231,23 +234,23 @@ public class AmatCleaner
 	private boolean CreateN1MMCallHistory(String outputDestinationPath)
 	{
 		File HDdatFile = new File(Paths.get(outputDestinationPath,"HD.dat").toString());
-		File ENdatFile = new File(Paths.get(outputDestinationPath,"EN.dat").toString());
 		File AMdatFile = new File(Paths.get(outputDestinationPath,"AM.dat").toString());
+		File ENdatFile = new File(Paths.get(outputDestinationPath,"EN.dat").toString());
 		BufferedReader reader = null;
 		BufferedWriter writer = null;
-		String fileToProcess, record;
+		String record;
 		String splitBy = Pattern.quote("|");
 		String headerFooter = "========================================================================================";
 		int numErrors = 0;
-		String n1mmCallHistoryFileName = "POTA_FCC_N1MM_CallHistory.txt";
+		String n1mmCallHistoryFileName = GetN1MMPotaCallHisotryFileName();
 		String[] fields;
 		String uniqueSystemIdentifier, licenseStatus, licenseClass, attentionLine;
-		String callSign, firstName, state;
+		String callSign, firstName, state, applicantTypeCode;
 		String callHistoryRecord;
 		int notActiveCount = 0;
 
 		out(headerFooter);
-		out("Processing N1MM call history creation");
+		out("Creating N1MM call history: " + GetDateTimeUTC() + " File: " + n1mmCallHistoryFileName);
 		out(headerFooter);
 
 		try
@@ -255,16 +258,14 @@ public class AmatCleaner
 			// see file:///C:/Users/ng7m/Downloads/public_access_database_definitions_20240215.pdf for FCC file format details
 			HashMap<String, String> hdHashMap = new HashMap<>();
 
-			out("Creating HDdat hashtable from: " + HDdatFile);
-
 			reader = new BufferedReader(new FileReader((HDdatFile)));
 			while ((record = reader.readLine()) != null)
 			{
 
 				fields = record.split(splitBy, -1);
-				uniqueSystemIdentifier = fields[1].trim();
-				callSign = fields[4].trim();
-				licenseStatus = fields[5].trim();
+				uniqueSystemIdentifier = fields[1];
+				callSign = fields[4];
+				licenseStatus = fields[5];
 
 				hdHashMap.put(uniqueSystemIdentifier, licenseStatus);
 
@@ -280,19 +281,18 @@ public class AmatCleaner
 
 			// read in the AM.dat file and create a hash table used to look up the license class
 			HashMap<String, String> amHashMap = new HashMap<>();
-			int generalClassCount = 0, advancedClassCount= 0, extranClassCount = 0, allGenAdvExtCount = 0;
+			int generalClassCount = 0, advancedClassCount= 0, extraClassCount = 0;
+			int clubCalls = 0, totalRecords = 0;
 			int allOtherLicenceClasses = 0;
-
-			out("Creating AMdat hashtable from: " + AMdatFile);
 
 			reader = new BufferedReader(new FileReader((AMdatFile)));
 			while ((record = reader.readLine()) != null)
 			{
 
 				fields = record.split(splitBy, -1);
-				uniqueSystemIdentifier = fields[1].trim();
-				callSign = fields[4].trim();
-				licenseClass = fields[5].trim();
+				uniqueSystemIdentifier = fields[1];
+				callSign = fields[4];
+				licenseClass = fields[5];
 
 				amHashMap.put(uniqueSystemIdentifier, licenseClass);
 
@@ -320,20 +320,39 @@ public class AmatCleaner
 				// write out the header details (comments show what fields VE3FP is using)
 				//writer.write("!!Order!!,Call,Name,Exch1,CommentText\r\n");
 				boolean addRecord = false;
-				writer.write("!!Order!!,Call,Name,Exch1\r\n");
+
+				// write out the header and other comments
+
+				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
+
+				WriteCommentToBufferedWriter(writer, headerFooter);
+				WriteCommentToBufferedWriter(writer,"This file is intended to be used with N1MM as call history");
+				WriteCommentToBufferedWriter(writer,"to resolve names and states during POTA activations.");
+				WriteCommentToBufferedWriter(writer, headerFooter);
+				WriteCommentToBufferedWriter(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
+				WriteCommentToBufferedWriter(writer,"File created: " + GetDateTimeUTC());
+				WriteCommentToBufferedWriter(writer,"File name: " + n1mmCallHistoryFileName);
+				WriteCommentToBufferedWriter(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
+				WriteCommentToBufferedWriter(writer,"VE callsign database to be imported soon.");
+				WriteCommentToBufferedWriter(writer,"Be patient when loading this call history into N1MM.  There are over 400K entries.");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+
+
 				while ((record = reader.readLine()) != null)
 				{
+					totalRecords++;
 					fields = record.split(splitBy, -1);
-					uniqueSystemIdentifier = fields[1].trim();
-					callSign = fields[4].trim();
-					firstName = fields[8].trim();
-					state = fields[17].trim();
-					attentionLine = fields[20].trim(); // used to get a name for club calls
+					uniqueSystemIdentifier = fields[1];
+					callSign = fields[4];
+					firstName = fields[8];
+					state = fields[17];
+					attentionLine = fields[20]; // used to get a name for club calls
+					applicantTypeCode = fields[23];
 
 					// check license status from the HD.had hash map and only continue if 'A' Active status
 					licenseStatus = hdHashMap.get(uniqueSystemIdentifier);
 
-					if (licenseStatus.equals("A"))
+					if (licenseStatus.equals("A")) // only include active
 					{
 
 						// check amHashMap to see if we have a general, advanced or extra class license
@@ -352,23 +371,44 @@ public class AmatCleaner
 									addRecord = true;
 									break;
 								case "E":
-									extranClassCount++;
+									extraClassCount++;
 									addRecord = true;
 									break;
 								case "":  // club calls?  Get the name from attentionLine
-									// set first name to the first name grabbed from attentionLine
-									if (attentionLine.indexOf(" ") > 0)
+									if (applicantTypeCode.equals("B")) // B is a Club Call, see https://www.fcc.gov/sites/default/files/pubacc_tbl_abbr_names_20240215.pdf
 									{
-										firstName = attentionLine.substring(0, attentionLine.indexOf(" "));
+										clubCalls++;
+										// set first name to the longest first name grabbed from attentionLine
+										fields = attentionLine.split(" ", -1);
+										if (fields.length > 2) // if a three part name like "Max M George"
+										{
+											firstName = fields[0];
+											if (fields[1].length() > firstName.length())
+											{
+												// make first name the longer of the first two names
+												firstName = fields[1];
+											}
+										}
+										else if (fields.length == 2) // if two names grab the first
+										{
+											firstName = fields[0];
+										}
+										else if (!fields[0].isEmpty()) // if attention line is one word use it as the first name
+										{
+											firstName = fields[0];
+										}
+										addRecord = true;
 									}
-									addRecord = true;
+									else
+									{
+										addRecord = false;
+									}
 									break;
 								default:
+									// exclude anything else
 									allOtherLicenceClasses++;
 									addRecord = false;
 							}
-
-							allGenAdvExtCount = generalClassCount + advancedClassCount + extranClassCount;
 
 							if (addRecord)
 							{
@@ -376,12 +416,23 @@ public class AmatCleaner
 								writer.write(callHistoryRecord);
 							}
 						}
-					}
+					}  // end of if active callsign
 					else
 					{
 						notActiveCount++;
 					}
 				} // while ripping through EN.dat records
+				out("Included: " + generalClassCount + " general class calls");
+				out("Included: " + advancedClassCount + " advanced class calls");
+				out("Included: " + extraClassCount + " extra class calls");
+				out("Included: " + clubCalls + " club calls");
+				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
+				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
+				out("Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
+				out("Excluded: " + notActiveCount + " not active calls");
+				out("Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
+				out("Total records processed: " + totalRecords);
+
 			}
 		} catch(FileNotFoundException e)
 		{
@@ -419,12 +470,45 @@ public class AmatCleaner
 		return (numErrors > 0) ? true : false;
 	}
 
+	private void WriteCommentToBufferedWriter(BufferedWriter writer, String comment) throws IOException
+    {
+		if (null != writer)
+		{
+			writer.write("# " + comment + "\r\n");
+		}
+
+	}
+
+	private String GetDateTimeUTC()
+	{
+		Instant instant = Instant.now();
+
+		// Define the desired format, see: https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html
+		DateTimeFormatter formatter =
+				DateTimeFormatter.ofPattern("E, M-dd-yyyy, HH:mm:ss z").withZone(ZoneId.of("UTC"));
+
+		return formatter.format(instant);
+	}
+
+	private String GetN1MMPotaCallHisotryFileName()
+	{
+		Instant instant = Instant.now();
+
+		// Define the desired format, see: https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html
+		DateTimeFormatter formatter =
+				DateTimeFormatter.ofPattern("MM-dd-yyyy").withZone(ZoneId.of("UTC"));
+
+		String formatted =  formatter.format(instant);
+		return "POTA-" + formatted + ".txt";
+	}
+
 
 	private boolean validateFields(String fileName, int recordNum, StringBuilder sbRecord)
 	{
 		boolean fieldsOK = false;
 		String splitBy = Pattern.quote("|");
 		String record = sbRecord.toString();
+		StringBuilder cleanedRecord = new StringBuilder();
 		boolean verboseOutput = getConfiguration().verboseOutput;
 
 		// check for non ascii chars
@@ -443,10 +527,10 @@ public class AmatCleaner
 			}
 		}
 
-		// use comma as separator
 		String[] fields = record.split(splitBy, -1);
+
 		int fieldsPerRecord = 0;
-		int fieldLengths[] = null;
+		int[] fieldLengths = null;
 
 		fileName = fileName.toUpperCase();
 		switch(fileName)
@@ -506,6 +590,9 @@ public class AmatCleaner
 			{
 				for(int x = 0; x < fieldsPerRecord; x++)
 				{
+					// trim white space off each field, we find that some fields apparently have fat fingered leading and trailing white space
+					fields[x] = fields[x].trim();
+
 					if(fields[x].length() > fieldLengths[x])
 					{
 						if(verboseOutput)
@@ -520,16 +607,15 @@ public class AmatCleaner
 						{
 							out("Field length trimmed to documented length of: " + fieldLengths[x] + " New field value: " + fields[x]);
 						}
-
-						fieldsOK = true;
-						break;
 					}
+					cleanedRecord.append(fields[x]).append( (x < fieldsPerRecord -1) ? "|" : "");
 				}
 			}
 		}
 
 		if(fieldsOK)
 		{
+			record = cleanedRecord.toString();
 			sbRecord.replace(0, record.length(), record);
 		}
 
