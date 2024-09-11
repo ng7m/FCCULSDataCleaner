@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -245,9 +246,15 @@ public class AmatCleaner
 		String n1mmCallHistoryFileName = GetN1MMPotaCallHisotryFileName();
 		String[] fields;
 		String uniqueSystemIdentifier, licenseStatus, licenseClass, attentionLine;
-		String callSign, firstName, state, applicantTypeCode;
+		String callSign, firstName, state, applicantTypeCode, expiredDate;
 		String callHistoryRecord;
-		int notActiveCount = 0;
+		int notActiveCount = 0, activeButExpired = 0;
+		ArrayList<String> workingArrayList;
+		SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yy");
+		Date workingDate;
+		Calendar calendar = Calendar.getInstance();
+		Date today = new Date();
+		boolean licenseExpired;
 
 		out(headerFooter);
 		out("Creating N1MM call history: " + GetDateTimeUTC() + " File: " + n1mmCallHistoryFileName);
@@ -256,19 +263,25 @@ public class AmatCleaner
 		try
 		{
 			// see file:///C:/Users/ng7m/Downloads/public_access_database_definitions_20240215.pdf for FCC file format details
-			HashMap<String, String> hdHashMap = new HashMap<>();
+			// read in the HD.dat file and create a hash table used to look up active and expired
+			HashMap<String, ArrayList<String>> hdHashMap = new HashMap<>();
 
 			reader = new BufferedReader(new FileReader((HDdatFile)));
 			while ((record = reader.readLine()) != null)
 			{
+				ArrayList<String> hdEntryList = new ArrayList<>();
 
 				fields = record.split(splitBy, -1);
+
 				uniqueSystemIdentifier = fields[1];
 				callSign = fields[4];
+				hdEntryList.add(callSign);
 				licenseStatus = fields[5];
+				hdEntryList.add(licenseStatus);
+				expiredDate = fields[8];
+				hdEntryList.add(expiredDate);
 
-				hdHashMap.put(uniqueSystemIdentifier, licenseStatus);
-
+				hdHashMap.put(uniqueSystemIdentifier, hdEntryList);
 			}
 
 			try
@@ -350,13 +363,38 @@ public class AmatCleaner
 					applicantTypeCode = fields[23];
 
 					// check license status from the HD.had hash map and only continue if 'A' Active status
-					licenseStatus = hdHashMap.get(uniqueSystemIdentifier);
+					workingArrayList = hdHashMap.get(uniqueSystemIdentifier);
+					licenseStatus = workingArrayList.get(1);
+					expiredDate = workingArrayList.get(2);
 
 					if (licenseStatus.equals("A")) // only include active
 					{
-
 						// check amHashMap to see if we have a general, advanced or extra class license
 						licenseClass = amHashMap.get(uniqueSystemIdentifier);
+
+						// check if the call is still active in the expiration windows
+						licenseExpired = false;
+						if (licenseClass.equals("G") ||
+								licenseClass.equals("A") ||
+								licenseClass.equals("E") ||
+                                licenseClass.isEmpty())
+						{
+							if (!expiredDate.isEmpty())
+							{
+								workingDate = dateFormat.parse(expiredDate);
+								calendar.setTime(workingDate);
+								calendar.add(Calendar.DATE, -14);
+								workingDate = calendar.getTime();
+
+								licenseExpired = today.after(workingDate);
+								if (licenseExpired)
+								{
+									out("Callsign: " + callSign + " License Expiration: " + workingDate.toString() + " License status: " + licenseStatus);
+									activeButExpired++;
+									continue;
+								}
+							}
+						}
 
 						if (null != licenseClass)
 						{
@@ -429,6 +467,7 @@ public class AmatCleaner
 				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
 				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
 				out("Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
+				out("Excluded: " + activeButExpired + " active but expired or soon to expire");
 				out("Excluded: " + notActiveCount + " not active calls");
 				out("Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
 				out("Total records processed: " + totalRecords);
@@ -440,7 +479,10 @@ public class AmatCleaner
 		} catch(IOException e)
 		{
 			e.printStackTrace();
-		} finally
+		} catch (ParseException e)
+        {
+            throw new RuntimeException(e);
+        } finally
 		{
 			if(reader != null)
 			{
@@ -476,7 +518,6 @@ public class AmatCleaner
 		{
 			writer.write("# " + comment + "\r\n");
 		}
-
 	}
 
 	private String GetDateTimeUTC()
@@ -496,7 +537,7 @@ public class AmatCleaner
 
 		// Define the desired format, see: https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html
 		DateTimeFormatter formatter =
-				DateTimeFormatter.ofPattern("MM-dd-yyyy").withZone(ZoneId.of("UTC"));
+				DateTimeFormatter.ofPattern("MM-dd-yyyy-z").withZone(ZoneId.of("UTC"));
 
 		String formatted =  formatter.format(instant);
 		return "POTA-" + formatted + ".txt";
