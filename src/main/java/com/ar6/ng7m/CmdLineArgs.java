@@ -102,4 +102,25 @@ public class CmdLineArgs
 		return workingDirectory;
 	}
 
+	@Arg(dest = "n1mmchod")
+	private String n1mmCallHistoryOutputDirectory="";
+	public String GetN1MMCallHistoryOutputDirectory()
+	{
+		// default to a working direct / temp OS path
+		if (n1mmCallHistoryOutputDirectory.isEmpty())
+		{
+			// Get the temporary directory and print it.
+			String tempDir = System.getProperty("java.io.tmpdir");
+
+			Path filePath = Paths.get(tempDir, "FCCULSDataCleaner/N1MMCallHistory");
+			n1mmCallHistoryOutputDirectory = filePath.toString();
+
+			System.out.println("Using OS Temp File Path as N1MM call history output directory: " + n1mmCallHistoryOutputDirectory);
+		}
+
+		ValidateOrCreateDirectory(n1mmCallHistoryOutputDirectory);
+
+		return n1mmCallHistoryOutputDirectory;
+	}
+
 }

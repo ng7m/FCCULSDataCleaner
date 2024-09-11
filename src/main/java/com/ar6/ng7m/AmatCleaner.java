@@ -124,22 +124,20 @@ public class AmatCleaner
 
 							createZipFile(outputDestinationPath, path.toAbsolutePath().toString());
 						}
-
-						// check to see if we need to create the N1MM call history file after files have been cleaned
-						if (argumentValues.createN1MMCallHistory)
-						{
-							// rip through the files that match the file name filter object
-							// cherry pick the ones we are
-							for (File file : filesInDir)
-							{
-								if (file.getName().equals("EN.dat"))
-								{
-									bSuccessful = CreateN1MMCallHistory(outputDestinationPath);
-								}
-							}
-						}
 					}
 				}
+
+				// check to see if we need to create the N1MM call history file after files have been cleaned
+				if (argumentValues.createN1MMCallHistory)
+				{
+					if (bSuccessful)
+					{
+						String n1mmCallHistoryOutputDirectoryPath = argumentValues.GetN1MMCallHistoryOutputDirectory();
+
+						bSuccessful = CreateN1MMCallHistory(outputDestinationPath, n1mmCallHistoryOutputDirectoryPath);
+					}
+				}
+
 				out("Finished Processing...");
 				out("Processing Completed in: " + (System.currentTimeMillis() - startTime) / 1000 + " Seconds...");
 			}
@@ -232,7 +230,7 @@ public class AmatCleaner
 		return (numErrors > 0) ? true : false;
 	}
 
-	private boolean CreateN1MMCallHistory(String outputDestinationPath)
+	private boolean CreateN1MMCallHistory(String outputDestinationPath, String n1mmCallHistoryOutputPath)
 	{
 		File HDdatFile = new File(Paths.get(outputDestinationPath,"HD.dat").toString());
 		File AMdatFile = new File(Paths.get(outputDestinationPath,"AM.dat").toString());
@@ -255,6 +253,7 @@ public class AmatCleaner
 		Calendar calendar = Calendar.getInstance();
 		Date today = new Date();
 		boolean licenseExpired;
+		List<String> bigListOfCallsigns = new ArrayList<>();
 
 		out(headerFooter);
 		out("Creating N1MM call history: " + GetDateTimeUTC() + " File: " + n1mmCallHistoryFileName);
@@ -322,7 +321,7 @@ public class AmatCleaner
 			reader = new BufferedReader(new FileReader(ENdatFile));
 
 			// now make sure we can create the output file
-			Path path = Paths.get(outputDestinationPath, n1mmCallHistoryFileName);
+			Path path = Paths.get(n1mmCallHistoryOutputPath, n1mmCallHistoryFileName);
 
 			if(!getConfiguration().readOnly)
 			{
@@ -333,23 +332,6 @@ public class AmatCleaner
 				// write out the header details (comments show what fields VE3FP is using)
 				//writer.write("!!Order!!,Call,Name,Exch1,CommentText\r\n");
 				boolean addRecord = false;
-
-				// write out the header and other comments
-
-				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
-
-				WriteCommentToBufferedWriter(writer, headerFooter);
-				WriteCommentToBufferedWriter(writer,"This file is intended to be used with N1MM as call history");
-				WriteCommentToBufferedWriter(writer,"to resolve names and states during POTA activations.");
-				WriteCommentToBufferedWriter(writer, headerFooter);
-				WriteCommentToBufferedWriter(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
-				WriteCommentToBufferedWriter(writer,"File created: " + GetDateTimeUTC());
-				WriteCommentToBufferedWriter(writer,"File name: " + n1mmCallHistoryFileName);
-				WriteCommentToBufferedWriter(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
-				WriteCommentToBufferedWriter(writer,"VE callsign database to be imported soon.");
-				WriteCommentToBufferedWriter(writer,"Be patient when loading this call history into N1MM.  There are over 400K entries.");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-
 
 				while ((record = reader.readLine()) != null)
 				{
@@ -389,7 +371,7 @@ public class AmatCleaner
 								licenseExpired = today.after(workingDate);
 								if (licenseExpired)
 								{
-									out("Callsign: " + callSign + " License Expiration: " + workingDate.toString() + " License status: " + licenseStatus);
+									//out("Callsign: " + callSign + " License Expiration: " + workingDate.toString() + " License status: " + licenseStatus);
 									activeButExpired++;
 									continue;
 								}
@@ -450,8 +432,12 @@ public class AmatCleaner
 
 							if (addRecord)
 							{
+								// build up an array of the strings to export / write to the file so we can get
+								// stats to put in comments at the top of the call history file
+
 								callHistoryRecord = callSign + ',' + firstName + ',' + state + '\r' + '\n';
-								writer.write(callHistoryRecord);
+								bigListOfCallsigns.add(callHistoryRecord);
+								//writer.write(callHistoryRecord);
 							}
 						}
 					}  // end of if active callsign
@@ -460,18 +446,52 @@ public class AmatCleaner
 						notActiveCount++;
 					}
 				} // while ripping through EN.dat records
-				out("Included: " + generalClassCount + " general class calls");
-				out("Included: " + advancedClassCount + " advanced class calls");
-				out("Included: " + extraClassCount + " extra class calls");
-				out("Included: " + clubCalls + " club calls");
-				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
-				out("Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
-				out("Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
-				out("Excluded: " + activeButExpired + " active but expired or soon to expire");
-				out("Excluded: " + notActiveCount + " not active calls");
-				out("Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
-				out("Total records processed: " + totalRecords);
 
+				// write out the header and other comments
+				WriteCommentToBufferedWriter(writer, headerFooter);
+				WriteCommentToBufferedWriter(writer,"This file is intended to be used with N1MM as call history");
+				WriteCommentToBufferedWriter(writer,"to resolve names and states during POTA activations.");
+				WriteCommentToBufferedWriter(writer,"This call history file would be compatible with any N1MM contest");
+				WriteCommentToBufferedWriter(writer,"that uses Name and Exch1");
+				WriteCommentToBufferedWriter(writer, headerFooter);
+				WriteCommentToBufferedWriter(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
+				WriteCommentToBufferedWriter(writer,"File created: " + GetDateTimeUTC());
+				WriteCommentToBufferedWriter(writer,"File name: " + n1mmCallHistoryFileName);
+				WriteCommentToBufferedWriter(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
+				WriteCommentToBufferedWriter(writer,"VE callsign database to be imported soon.");
+				WriteCommentToBufferedWriter(writer,"Be patient when loading this call history into N1MM.  There are over 400K entries.");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer,"Included US FCC call database statistics:");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer, "Included: " + generalClassCount + " general class calls");
+				WriteCommentToBufferedWriter(writer, "Included: " + advancedClassCount + " advanced class calls");
+				WriteCommentToBufferedWriter(writer, "Included: " + extraClassCount + " extra class calls");
+				WriteCommentToBufferedWriter(writer, "Included: " + clubCalls + " club calls");
+				WriteCommentToBufferedWriter(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
+				WriteCommentToBufferedWriter(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer,"Excluded call statistics:");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer, "Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
+				WriteCommentToBufferedWriter(writer, "Excluded: " + activeButExpired + " active but expired or soon to expire");
+				WriteCommentToBufferedWriter(writer, "Excluded: " + notActiveCount + " not active calls");
+				WriteCommentToBufferedWriter(writer, "Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer,"Total raw callsign records processed in FCC callsign database: " + totalRecords);
+				WriteCommentToBufferedWriter(writer, "Total included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				WriteCommentToBufferedWriter(writer,headerFooter);
+
+				// write the N1MM call history header descriptor
+				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
+
+				// write out all the entries int the big list of callsigns to include in call history file
+				for ( String listEntry : bigListOfCallsigns)
+				{
+					writer.write(listEntry);
+				}
+				WriteCommentToBufferedWriter(writer,headerFooter);
+				WriteCommentToBufferedWriter(writer, "Total Calls in file: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				WriteCommentToBufferedWriter(writer,headerFooter);
 			}
 		} catch(FileNotFoundException e)
 		{
@@ -517,6 +537,10 @@ public class AmatCleaner
 		if (null != writer)
 		{
 			writer.write("# " + comment + "\r\n");
+			if (getConfiguration().verboseOutput)
+			{
+				out(comment);
+			}
 		}
 	}
 
@@ -793,7 +817,7 @@ public class AmatCleaner
 
 			if(file.isDirectory() && file.canWrite())
 			{
-				out("Output Path Valid: " + file.getAbsolutePath());
+				out("Output path valid: " + file.getAbsolutePath());
 				bReturn = true;
 			}
 			else
@@ -821,13 +845,41 @@ public class AmatCleaner
 
 			if(file.isDirectory() && file.canWrite())
 			{
-				out("Working Path Valid: " + file.getAbsolutePath());
+				out("Working path valid: " + file.getAbsolutePath());
 				bReturn = true;
 			}
 			else
 			{
 				file = null;
 				out("Invalid working directory!");
+			}
+		}
+
+		return file;
+	}
+
+	private File n1mmCallHistoryOutputDirectoryIsValid(String directoryToValidate)
+	{
+		boolean bReturn = false;
+		File file = null;
+
+		if(directoryToValidate == null)
+		{
+			out("Missing N1MM call history output directory.");
+		}
+		else
+		{
+			file = new File(directoryToValidate);
+
+			if(file.isDirectory() && file.canWrite())
+			{
+				out("N1MM Call history output path valid: " + file.getAbsolutePath());
+				bReturn = true;
+			}
+			else
+			{
+				file = null;
+				out("Invalid M1MM call history directory!");
 			}
 		}
 

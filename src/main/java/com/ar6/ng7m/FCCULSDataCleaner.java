@@ -113,17 +113,22 @@ public class FCCULSDataCleaner
 					.type(Boolean.class).setDefault(Boolean.FALSE)
 					.help("Create N1MM Call History File.");
 
+			_argsParser.addArgument("-n1mmchod")
+					.type(String.class).setDefault("")
+					.help("Output Directory for N1MM call history file generation. Uses Temp Location if not specified.");
+
 			_argsParser.addArgument("-fccAmURL")
 					.type(String.class).setDefault("ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip")
 					.help("FCC URL to ULS Amateur Complete Zipped Data Download:");
 
 			_argsParser.addArgument("-o")
 					.type(String.class).setDefault("")
-					.help("Output Directory for new zip file. Uses Temp Location if not specified.");
+					.help("Output Directory for new zip file. Uses OS temp location if not specified.");
 
 			_argsParser.addArgument("-wd")
 					.type(String.class).setDefault("")
-					.help("Working directory for -fccAmURL download.");
+					.help("Working directory for -fccAmURL download. Uses OS temp location if not specified.");
+
 
 		}
     	return _argsParser;
