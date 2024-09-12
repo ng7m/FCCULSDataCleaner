@@ -5,6 +5,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,7 +72,7 @@ public class AmatCleaner
                 out("Downloading: " + argumentValues.fccAmatuerLicenseCompleteURL);
                 out("Be Patient! File is over 100 megs...");
 
-                if (CopyURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString()))
+                if (CopyFTPURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString()))
                 {
                     // if we made it here, we have a zip file that needs to be extracted
                     unZipFile(workingDirectoryPath, zipFileName);
@@ -132,11 +133,42 @@ public class AmatCleaner
 				{
 					if (bSuccessful)
 					{
-						String n1mmCallHistoryOutputDirectoryPath = argumentValues.GetN1MMCallHistoryOutputDirectory();
+						// check and see if we need to download the VE callsign database
+						if (argumentValues.includeVECallHistory)
+						{
+							String veWorkingingDirectoryPath = argumentValues.GetVEN1MMCallHistoryWorkingDirectory();
+							File veWorkingDirectory = workingDirectoryIsValid(workingDirectoryPath);
 
-						bSuccessful = CreateN1MMCallHistory(outputDestinationPath, n1mmCallHistoryOutputDirectoryPath);
+							if (veWorkingDirectory.isDirectory())
+							{
+								String veZipFileName = argumentValues.GetVeZipFileName();
+
+								// create the temp working directory if needed
+								Path filePath = Paths.get(veWorkingingDirectoryPath, veZipFileName);
+
+								// reach out and download the file, make sure and set proxy jvm properties if
+								// running from a NAT based network, user must set env var proxy variables
+								out("Downloading: " + argumentValues.veAmatuerLicenseCompleteURL);
+								out("Be Patient! File is over 2 megs...");
+
+								if (CopyHTTPURLtoFile(argumentValues.veAmatuerLicenseCompleteURL, filePath.toString()))
+								{
+									// if we made it here, we have a zip file that needs to be extracted
+									unZipFile(veWorkingingDirectoryPath, veZipFileName);
+
+									bSuccessful = true;
+								}
+							}
+						}	// if including ve call database
+
+						if (bSuccessful)
+						{
+							String n1mmCallHistoryOutputDirectoryPath = argumentValues.GetN1MMCallHistoryOutputDirectory();
+
+							bSuccessful = CreateN1MMCallHistory();
+						}
 					}
-				}
+				}	// if creating n1mm call hisotry
 
 				out("Finished Processing...");
 				out("Processing Completed in: " + (System.currentTimeMillis() - startTime) / 1000 + " Seconds...");
@@ -230,8 +262,12 @@ public class AmatCleaner
 		return (numErrors > 0) ? true : false;
 	}
 
-	private boolean CreateN1MMCallHistory(String outputDestinationPath, String n1mmCallHistoryOutputPath)
+	private boolean CreateN1MMCallHistory()
 	{
+		CmdLineArgs argumentValues = getConfiguration();
+		String outputDestinationPath = argumentValues.GetOutputDestination();
+		String n1mmCallHistoryOutputDirectory = argumentValues.GetN1MMCallHistoryOutputDirectory();
+
 		File HDdatFile = new File(Paths.get(outputDestinationPath,"HD.dat").toString());
 		File AMdatFile = new File(Paths.get(outputDestinationPath,"AM.dat").toString());
 		File ENdatFile = new File(Paths.get(outputDestinationPath,"EN.dat").toString());
@@ -254,6 +290,7 @@ public class AmatCleaner
 		Date today = new Date();
 		boolean licenseExpired;
 		List<String> bigListOfCallsigns = new ArrayList<>();
+		List<String> bigListOfVECallsigns = new ArrayList<>();
 
 		out(headerFooter);
 		out("Creating N1MM call history: " + GetDateTimeUTC() + " File: " + n1mmCallHistoryFileName);
@@ -296,6 +333,8 @@ public class AmatCleaner
 			int generalClassCount = 0, advancedClassCount= 0, extraClassCount = 0;
 			int clubCalls = 0, totalRecords = 0;
 			int allOtherLicenceClasses = 0;
+			int veTotalRecords = 0;
+			int veAllOtherLicenseClasses = 0;
 
 			reader = new BufferedReader(new FileReader((AMdatFile)));
 			while ((record = reader.readLine()) != null)
@@ -321,7 +360,7 @@ public class AmatCleaner
 			reader = new BufferedReader(new FileReader(ENdatFile));
 
 			// now make sure we can create the output file
-			Path path = Paths.get(n1mmCallHistoryOutputPath, n1mmCallHistoryFileName);
+			Path path = Paths.get(n1mmCallHistoryOutputDirectory, n1mmCallHistoryFileName);
 
 			if(!getConfiguration().readOnly)
 			{
@@ -437,7 +476,6 @@ public class AmatCleaner
 
 								callHistoryRecord = callSign + ',' + firstName + ',' + state + '\r' + '\n';
 								bigListOfCallsigns.add(callHistoryRecord);
-								//writer.write(callHistoryRecord);
 							}
 						}
 					}  // end of if active callsign
@@ -447,7 +485,54 @@ public class AmatCleaner
 					}
 				} // while ripping through EN.dat records
 
-				// write out the header and other comments
+				// now check to see if we loaded the VE callsign database and rip through it
+				if (argumentValues.includeVECallHistory)
+				{
+					String veN1MMCallHistoryWorkingDirectory = argumentValues.GetVEN1MMCallHistoryWorkingDirectory();
+					String providence, qualA, qualB, qualC, qualD, qualE, clubName1, clubName2, clubProvidence;
+
+					File veAmateurDelimitedTxtFile = new File(Paths.get(veN1MMCallHistoryWorkingDirectory,"amateur_delim.txt").toString());
+					reader = new BufferedReader(new FileReader(veAmateurDelimitedTxtFile));
+
+					addRecord = false;
+
+					// skip the first header record
+					reader.readLine();
+					// the header looks like this:
+					// callsign;first_name;surname;address_line;city;prov_cd;postal_code;qual_a;qual_b;qual_c;qual_d;qual_e;club_name;club_name_2;club_address;club_city;club_prov_cd;club_postal_code
+
+					while ((record = reader.readLine()) != null)
+					{
+						fields = record.split(";", -1);
+						callSign = fields[0].trim();
+						firstName = fields[1].trim();
+						//providence, qualA, qualB, qualC, qualD, qualE, clubName1, clubName2, clubProvidence;
+						providence = fields[5].trim();
+						qualA = fields[7].trim();
+						qualB = fields[8].trim();
+						qualC = fields[9].trim();
+						qualD = fields[10].trim();
+						qualE = fields[11].trim();
+						clubName1 = fields[12].trim();
+						clubName2 = fields[13].trim();
+						clubProvidence = fields[16].trim();
+
+						addRecord = !callSign.isEmpty() && !providence.isEmpty();
+
+						if (addRecord)
+						{
+							// build up an array of the strings to export / write to the file so we can get
+							// stats to put in comments at the top of the call history file
+							veTotalRecords++;
+
+							callHistoryRecord = callSign + ',' + firstName + ',' + providence + '\r' + '\n';
+							bigListOfVECallsigns.add(callHistoryRecord);
+						}
+					} // while ripping through amateur_delim.txt ve callsign data records
+
+				}	// if include ve callsign database
+
+				// write out the header and other comments and then write out the callsign data
 				AddComment(writer, headerFooter);
 				AddComment(writer,"This file is intended to be used with N1MM as call history.");
 				AddComment(writer,"to resolve names and states during POTA activations.");
@@ -455,7 +540,7 @@ public class AmatCleaner
 				AddComment(writer,"that uses Name and Exch1.");
 				AddComment(writer, headerFooter);
 				AddComment(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
-				AddComment(writer,"Kudos to Ben, KI7KY and Jon, K7CO for testing during POTA activations in N1MM.");
+				AddComment(writer,"Kudos to Ben (KI7KY) and Jon (K7CO) for data validation and performance testing.");
 				AddComment(writer,"File created: " + GetDateTimeUTC());
 				AddComment(writer,"File name: " + n1mmCallHistoryFileName);
 				AddComment(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
@@ -491,8 +576,22 @@ public class AmatCleaner
 					writer.write(listEntry);
 				}
 				AddComment(writer,headerFooter);
-				AddComment(writer, "Total Calls in file: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer, "End of USA FCC callsigns. Number of USA FCC callsigns included above: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
 				AddComment(writer,headerFooter);
+
+				if (argumentValues.includeVECallHistory)
+				{
+					// write out all the entries int the big VE list of callsigns to include in call history file
+					for (String listEntry : bigListOfVECallsigns)
+					{
+						writer.write(listEntry);
+					}
+					AddComment(writer, headerFooter);
+					AddComment(writer, "End of Canadian VE callsigns. Number of Canadian VE callsigns included above: " + veTotalRecords);
+					AddComment(writer, headerFooter);
+				}
+
+
 			}
 		} catch(FileNotFoundException e)
 		{
@@ -907,7 +1006,7 @@ public class AmatCleaner
 		System.out.println(str);
 	}
 
-	boolean CopyURLtoFile(String uri, String file)
+	boolean CopyFTPURLtoFile(String uri, String file)
 	{
 		boolean bSuccess = false;
 		String exceptionCause = "";
@@ -928,5 +1027,31 @@ public class AmatCleaner
 		}
 		return bSuccess;
 	}
+
+	boolean CopyHTTPURLtoFile(String uri, String file)
+	{
+		boolean bSuccess = false;
+		String exceptionCause = "";
+		File httpFile = new File(file);
+
+		try
+		{
+			Downloader downloader = new Downloader();
+
+			File downloadedFile = downloader.httpDownload(new URI(uri), httpFile);
+			bSuccess = downloadedFile.toString().equals(file);
+
+		}
+		catch (UnsupportedOperationException | URISyntaxException e)
+		{
+			exceptionCause = e.getCause().toString();
+		}
+		if (!bSuccess)
+		{
+			out("URL: " + uri + " to File: " + file + " failed!" + exceptionCause);
+		}
+		return bSuccess;
+	}
+
 
 }

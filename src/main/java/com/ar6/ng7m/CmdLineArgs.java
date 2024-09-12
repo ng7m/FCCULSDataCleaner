@@ -68,17 +68,30 @@ public class CmdLineArgs
 	@Arg(dest = "fccAmURL")
 	public String fccAmatuerLicenseCompleteURL;
 
+	@Arg(dest = "veAmURL")
+	public String veAmatuerLicenseCompleteURL;
+
 	@Arg(dest = "z")
 	public boolean createOutputZipFile;
 
 	@Arg(dest = "n1mmch")
 	public boolean createN1MMCallHistory;
 
+	@Arg(dest = "ivech")
+	public boolean includeVECallHistory;
+
 	@Arg(dest = "zf")
 	private String zipFileName;
 	String GetZipFileName()
 	{
 		return zipFileName;
+	}
+
+	@Arg(dest = "vezf")
+	private String veZipFileName;
+	String GetVeZipFileName()
+	{
+		return veZipFileName;
 	}
 
 	@Arg(dest = "wd")
@@ -122,5 +135,28 @@ public class CmdLineArgs
 
 		return n1mmCallHistoryOutputDirectory;
 	}
+
+	@Arg(dest = "vewd")
+	private String veN1MMCallHistoryWorkingDirectory="";
+	public String GetVEN1MMCallHistoryWorkingDirectory()
+	{
+		// default to a working direct / temp OS path
+		if (veN1MMCallHistoryWorkingDirectory.isEmpty())
+		{
+			// Get the temporary directory and print it.
+			String tempDir = System.getProperty("java.io.tmpdir");
+
+			Path filePath = Paths.get(tempDir, "VEAmateurDB/temp");
+			veN1MMCallHistoryWorkingDirectory = filePath.toString();
+
+			System.out.println("Using OS Temp File Path as VE Database working Directory: " + veN1MMCallHistoryWorkingDirectory);
+		}
+
+		ValidateOrCreateDirectory(veN1MMCallHistoryWorkingDirectory);
+
+		return veN1MMCallHistoryWorkingDirectory;
+	}
+
+
 
 }

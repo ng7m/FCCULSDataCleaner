@@ -105,6 +105,12 @@ public class FCCULSDataCleaner
     			.type(Boolean.class).setDefault("l_amat.zip")
         		.help("Overrides Zip File Name where l_amat.zip is the default.");
 
+			// see https://ised-isde.canada.ca/site/amateur-radio-operator-certificate-services/en/downloads
+			// for Canadian Downloads related to Amateur Radio callsign data
+			_argsParser.addArgument("-vezf")
+					.type(Boolean.class).setDefault("amateur_delim.zip")
+					.help("Overrides VE callsign DB Zip File Name where amateur_delim.zip is the default.");
+
 			_argsParser.addArgument("-d")
 					.type(Boolean.class).setDefault(Boolean.TRUE)
 					.help("Download FCC ULS Data using -fccAmURL URL Specified.");
@@ -112,6 +118,10 @@ public class FCCULSDataCleaner
 			_argsParser.addArgument("-n1mmch")
 					.type(Boolean.class).setDefault(Boolean.FALSE)
 					.help("Create N1MM Call History File.");
+
+			_argsParser.addArgument("-ivech")
+					.type(Boolean.class).setDefault(Boolean.TRUE)
+					.help("Include VE callsign databasee as part of N1MM call history file export.");
 
 			_argsParser.addArgument("-n1mmchod")
 					.type(String.class).setDefault("")
@@ -121,6 +131,10 @@ public class FCCULSDataCleaner
 					.type(String.class).setDefault("ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip")
 					.help("FCC URL to ULS Amateur Complete Zipped Data Download:");
 
+			_argsParser.addArgument("-veAmURL")
+					.type(String.class).setDefault("https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip")
+					.help("VE Canadian Government Complete Zipped Data Download");
+
 			_argsParser.addArgument("-o")
 					.type(String.class).setDefault("")
 					.help("Output Directory for new zip file. Uses OS temp location if not specified.");
@@ -129,6 +143,9 @@ public class FCCULSDataCleaner
 					.type(String.class).setDefault("")
 					.help("Working directory for -fccAmURL download. Uses OS temp location if not specified.");
 
+			_argsParser.addArgument("-vewd")
+					.type(String.class).setDefault("")
+					.help("Working directory for -veAmURL download. Uses OS temp location if not specified.");
 
 		}
     	return _argsParser;
