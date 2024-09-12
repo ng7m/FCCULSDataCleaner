@@ -448,38 +448,39 @@ public class AmatCleaner
 				} // while ripping through EN.dat records
 
 				// write out the header and other comments
-				WriteCommentToBufferedWriter(writer, headerFooter);
-				WriteCommentToBufferedWriter(writer,"This file is intended to be used with N1MM as call history");
-				WriteCommentToBufferedWriter(writer,"to resolve names and states during POTA activations.");
-				WriteCommentToBufferedWriter(writer,"This call history file would be compatible with any N1MM contest");
-				WriteCommentToBufferedWriter(writer,"that uses Name and Exch1");
-				WriteCommentToBufferedWriter(writer, headerFooter);
-				WriteCommentToBufferedWriter(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
-				WriteCommentToBufferedWriter(writer,"File created: " + GetDateTimeUTC());
-				WriteCommentToBufferedWriter(writer,"File name: " + n1mmCallHistoryFileName);
-				WriteCommentToBufferedWriter(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
-				WriteCommentToBufferedWriter(writer,"VE callsign database to be imported soon.");
-				WriteCommentToBufferedWriter(writer,"Be patient when loading this call history into N1MM.  There are over 400K entries.");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer,"Included US FCC call database statistics:");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer, "Included: " + generalClassCount + " general class calls");
-				WriteCommentToBufferedWriter(writer, "Included: " + advancedClassCount + " advanced class calls");
-				WriteCommentToBufferedWriter(writer, "Included: " + extraClassCount + " extra class calls");
-				WriteCommentToBufferedWriter(writer, "Included: " + clubCalls + " club calls");
-				WriteCommentToBufferedWriter(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
-				WriteCommentToBufferedWriter(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer,"Excluded call statistics:");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer, "Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
-				WriteCommentToBufferedWriter(writer, "Excluded: " + activeButExpired + " active but expired or soon to expire");
-				WriteCommentToBufferedWriter(writer, "Excluded: " + notActiveCount + " not active calls");
-				WriteCommentToBufferedWriter(writer, "Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer,"Total raw callsign records processed in FCC callsign database: " + totalRecords);
-				WriteCommentToBufferedWriter(writer, "Total included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
-				WriteCommentToBufferedWriter(writer,headerFooter);
+				AddComment(writer, headerFooter);
+				AddComment(writer,"This file is intended to be used with N1MM as call history.");
+				AddComment(writer,"to resolve names and states during POTA activations.");
+				AddComment(writer,"This call history file would be compatible with any N1MM contest");
+				AddComment(writer,"that uses Name and Exch1.");
+				AddComment(writer, headerFooter);
+				AddComment(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
+				AddComment(writer,"Kudos to Ben, KI7KY and Jon, K7CO for testing during POTA activations in N1MM.");
+				AddComment(writer,"File created: " + GetDateTimeUTC());
+				AddComment(writer,"File name: " + n1mmCallHistoryFileName);
+				AddComment(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
+				AddComment(writer,"VE callsign database to be imported soon.");
+				AddComment(writer,"Be patient when loading this large call history into N1MM when using a slow PC.");
+				AddComment(writer,headerFooter);
+				AddComment(writer,"Included US FCC call database statistics:");
+				AddComment(writer,headerFooter);
+				AddComment(writer, "Included: " + generalClassCount + " general class calls");
+				AddComment(writer, "Included: " + advancedClassCount + " advanced class calls");
+				AddComment(writer, "Included: " + extraClassCount + " extra class calls");
+				AddComment(writer, "Included: " + clubCalls + " club calls");
+				AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
+				AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
+				AddComment(writer,headerFooter);
+				AddComment(writer,"Excluded call statistics:");
+				AddComment(writer,headerFooter);
+				AddComment(writer, "Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
+				AddComment(writer, "Excluded: " + activeButExpired + " active but expired or soon to expire");
+				AddComment(writer, "Excluded: " + notActiveCount + " not active calls");
+				AddComment(writer, "Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
+				AddComment(writer,headerFooter);
+				AddComment(writer,"Total raw callsign records processed in FCC callsign database: " + totalRecords);
+				AddComment(writer, "Total included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer,headerFooter);
 
 				// write the N1MM call history header descriptor
 				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
@@ -489,9 +490,9 @@ public class AmatCleaner
 				{
 					writer.write(listEntry);
 				}
-				WriteCommentToBufferedWriter(writer,headerFooter);
-				WriteCommentToBufferedWriter(writer, "Total Calls in file: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
-				WriteCommentToBufferedWriter(writer,headerFooter);
+				AddComment(writer,headerFooter);
+				AddComment(writer, "Total Calls in file: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer,headerFooter);
 			}
 		} catch(FileNotFoundException e)
 		{
@@ -532,7 +533,7 @@ public class AmatCleaner
 		return (numErrors > 0) ? true : false;
 	}
 
-	private void WriteCommentToBufferedWriter(BufferedWriter writer, String comment) throws IOException
+	private void AddComment(BufferedWriter writer, String comment) throws IOException
     {
 		if (null != writer)
 		{
