@@ -115,6 +115,10 @@ public class FCCULSDataCleaner
 					.type(Boolean.class).setDefault(Boolean.TRUE)
 					.help("Download FCC ULS Data using -fccAmURL URL Specified.");
 
+			_argsParser.addArgument("-dve")
+					.type(Boolean.class).setDefault(Boolean.TRUE)
+					.help("Download VE callsign data using -veAmURL URL Specified.");
+
 			_argsParser.addArgument("-n1mmch")
 					.type(Boolean.class).setDefault(Boolean.FALSE)
 					.help("Create N1MM Call History File.");

@@ -65,6 +65,9 @@ public class CmdLineArgs
 	@Arg(dest = "d")
 	public boolean downloadFccZip;
 
+	@Arg(dest = "dve")
+	public boolean downloadVEZip;
+
 	@Arg(dest = "fccAmURL")
 	public String fccAmatuerLicenseCompleteURL;
 

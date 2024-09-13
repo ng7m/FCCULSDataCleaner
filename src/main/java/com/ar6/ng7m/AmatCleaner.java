@@ -141,32 +141,28 @@ public class AmatCleaner
 
 							if (veWorkingDirectory.isDirectory())
 							{
-								String veZipFileName = argumentValues.GetVeZipFileName();
-
-								// create the temp working directory if needed
-								Path filePath = Paths.get(veWorkingingDirectoryPath, veZipFileName);
-
-								// reach out and download the file, make sure and set proxy jvm properties if
-								// running from a NAT based network, user must set env var proxy variables
-								out("Downloading: " + argumentValues.veAmatuerLicenseCompleteURL);
-								out("Be Patient! File is over 2 megs...");
-
-								if (CopyHTTPURLtoFile(argumentValues.veAmatuerLicenseCompleteURL, filePath.toString()))
+								if (argumentValues.downloadVEZip)
 								{
-									// if we made it here, we have a zip file that needs to be extracted
-									unZipFile(veWorkingingDirectoryPath, veZipFileName);
+									String veZipFileName = argumentValues.GetVeZipFileName();
 
-									bSuccessful = true;
+									// create the temp working directory if needed
+									Path filePath = Paths.get(veWorkingingDirectoryPath, veZipFileName);
+
+									// reach out and download the file, make sure and set proxy jvm properties if
+									// running from a NAT based network, user must set env var proxy variables
+									out("Downloading: " + argumentValues.veAmatuerLicenseCompleteURL);
+									out("Be Patient! File is over 2 megs...");
+
+									if (CopyHTTPURLtoFile(argumentValues.veAmatuerLicenseCompleteURL, filePath.toString()))
+									{
+										// if we made it here, we have a zip file that needs to be extracted
+										unZipFile(veWorkingingDirectoryPath, veZipFileName);
+									}
 								}
 							}
 						}	// if including ve call database
 
-						if (bSuccessful)
-						{
-							String n1mmCallHistoryOutputDirectoryPath = argumentValues.GetN1MMCallHistoryOutputDirectory();
-
-							bSuccessful = CreateN1MMCallHistory();
-						}
+						bSuccessful = CreateN1MMCallHistory();
 					}
 				}	// if creating n1mm call hisotry
 
@@ -333,8 +329,7 @@ public class AmatCleaner
 			int generalClassCount = 0, advancedClassCount= 0, extraClassCount = 0;
 			int clubCalls = 0, totalRecords = 0;
 			int allOtherLicenceClasses = 0;
-			int veTotalRecords = 0;
-			int veAllOtherLicenseClasses = 0;
+			int veTotalRecordsIncluded = 0, veBasicLicensesExcluded = 0, veClubCalls = 0, veTotalRawRecordsProcessed = 0;
 
 			reader = new BufferedReader(new FileReader((AMdatFile)));
 			while ((record = reader.readLine()) != null)
@@ -368,8 +363,6 @@ public class AmatCleaner
 			}
 			if (null != writer)
 			{
-				// write out the header details (comments show what fields VE3FP is using)
-				//writer.write("!!Order!!,Call,Name,Exch1,CommentText\r\n");
 				boolean addRecord = false;
 
 				while ((record = reader.readLine()) != null)
@@ -377,11 +370,11 @@ public class AmatCleaner
 					totalRecords++;
 					fields = record.split(splitBy, -1);
 					uniqueSystemIdentifier = fields[1];
-					callSign = fields[4];
+					callSign = fields[4].toUpperCase();
 					firstName = fields[8];
-					state = fields[17];
+					state = fields[17].toUpperCase();
 					attentionLine = fields[20]; // used to get a name for club calls
-					applicantTypeCode = fields[23];
+					applicantTypeCode = fields[23].toUpperCase();
 
 					// check license status from the HD.had hash map and only continue if 'A' Active status
 					workingArrayList = hdHashMap.get(uniqueSystemIdentifier);
@@ -437,25 +430,8 @@ public class AmatCleaner
 									if (applicantTypeCode.equals("B")) // B is a Club Call, see https://www.fcc.gov/sites/default/files/pubacc_tbl_abbr_names_20240215.pdf
 									{
 										clubCalls++;
-										// set first name to the longest first name grabbed from attentionLine
-										fields = attentionLine.split(" ", -1);
-										if (fields.length > 2) // if a three part name like "Max M George"
-										{
-											firstName = fields[0];
-											if (fields[1].length() > firstName.length())
-											{
-												// make first name the longer of the first two names
-												firstName = fields[1];
-											}
-										}
-										else if (fields.length == 2) // if two names grab the first
-										{
-											firstName = fields[0];
-										}
-										else if (!fields[0].isEmpty()) // if attention line is one word use it as the first name
-										{
-											firstName = fields[0];
-										}
+
+										firstName = ScrubFirstName(attentionLine);
 										addRecord = true;
 									}
 									else
@@ -474,7 +450,7 @@ public class AmatCleaner
 								// build up an array of the strings to export / write to the file so we can get
 								// stats to put in comments at the top of the call history file
 
-								callHistoryRecord = callSign + ',' + firstName + ',' + state + '\r' + '\n';
+								callHistoryRecord = callSign + ',' + ScrubFirstName(firstName) + ',' + state + '\r' + '\n';
 								bigListOfCallsigns.add(callHistoryRecord);
 							}
 						}
@@ -503,9 +479,10 @@ public class AmatCleaner
 
 					while ((record = reader.readLine()) != null)
 					{
+						record = record.toUpperCase();
 						fields = record.split(";", -1);
 						callSign = fields[0].trim();
-						firstName = fields[1].trim();
+						firstName = ScrubFirstName(fields[1]);;
 						//providence, qualA, qualB, qualC, qualD, qualE, clubName1, clubName2, clubProvidence;
 						providence = fields[5].trim();
 						qualA = fields[7].trim();
@@ -517,13 +494,33 @@ public class AmatCleaner
 						clubName2 = fields[13].trim();
 						clubProvidence = fields[16].trim();
 
+						veTotalRawRecordsProcessed++; // count the raw records processed
+
+						// seems to be the case on club calls, so we still want to add them
+						if (providence.isEmpty() && !clubProvidence.isEmpty())
+						{
+							veClubCalls++;
+							providence = clubProvidence;
+						}
+
+						// at this point if providence is empty, they will be excluded. callsign should never be empty at this point
 						addRecord = !callSign.isEmpty() && !providence.isEmpty();
+
+						if (addRecord)
+						{
+							// exclude them if they only have the basic qualification set to 'A', if any other options are set, include them
+							if (qualA.equals("A") && qualB.isEmpty() && qualC.isEmpty() && qualD.isEmpty() && qualD.isEmpty())
+							{
+								veBasicLicensesExcluded++;
+								addRecord = false;
+							}
+						}
 
 						if (addRecord)
 						{
 							// build up an array of the strings to export / write to the file so we can get
 							// stats to put in comments at the top of the call history file
-							veTotalRecords++;
+							veTotalRecordsIncluded++;
 
 							callHistoryRecord = callSign + ',' + firstName + ',' + providence + '\r' + '\n';
 							bigListOfVECallsigns.add(callHistoryRecord);
@@ -539,15 +536,16 @@ public class AmatCleaner
 				AddComment(writer,"This call history file would be compatible with any N1MM contest");
 				AddComment(writer,"that uses Name and Exch1.");
 				AddComment(writer, headerFooter);
-				AddComment(writer,"Code to export data written by Max NG7M (ng7m@arrl.net)");
+				AddComment(writer,"Code to export FCC and VE callsign data written by Max NG7M (ng7m@arrl.net)");
 				AddComment(writer,"Kudos to Ben (KI7KY) and Jon (K7CO) for data validation and performance testing.");
+				AddComment(writer,headerFooter);
 				AddComment(writer,"File created: " + GetDateTimeUTC());
 				AddComment(writer,"File name: " + n1mmCallHistoryFileName);
-				AddComment(writer,"Includes general, advanced, extra and club callsigns from FCC amateur database.");
-				AddComment(writer,"VE callsign database to be imported soon.");
+				AddComment(writer,headerFooter);
 				AddComment(writer,"Be patient when loading this large call history into N1MM when using a slow PC.");
 				AddComment(writer,headerFooter);
-				AddComment(writer,"Included US FCC call database statistics:");
+				AddComment(writer,headerFooter);
+				AddComment(writer,"US FCC call database statistics:");
 				AddComment(writer,headerFooter);
 				AddComment(writer, "Included: " + generalClassCount + " general class calls");
 				AddComment(writer, "Included: " + advancedClassCount + " advanced class calls");
@@ -563,12 +561,37 @@ public class AmatCleaner
 				AddComment(writer, "Excluded: " + notActiveCount + " not active calls");
 				AddComment(writer, "Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
 				AddComment(writer,headerFooter);
-				AddComment(writer,"Total raw callsign records processed in FCC callsign database: " + totalRecords);
-				AddComment(writer, "Total included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer,"Total raw callsign records processed in USA FCC callsign database: " + totalRecords);
+				AddComment(writer, "Total USA FCC included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
 				AddComment(writer,headerFooter);
 
+				// add ve related comments and stats
+				if (argumentValues.includeVECallHistory)
+				{
+					AddComment(writer,headerFooter);
+					AddComment(writer,"VE Canadian call database statistics:");
+					AddComment(writer,headerFooter);
+					AddComment(writer,"Included: " + (veTotalRecordsIncluded - veClubCalls) + " individual licensee calls with privileges below 30 mHz");
+					AddComment(writer,"Included: " + veClubCalls + " calls that appear to clubs");
+					AddComment(writer,"   Total: " + veTotalRecordsIncluded + " individual licensee and club calls");
+					AddComment(writer,headerFooter);
+					AddComment(writer,"Excluded call statistics:");
+					AddComment(writer,headerFooter);
+					AddComment(writer,"Excluded: " + veBasicLicensesExcluded + " calls with Basic qualification with only privileges above 30 mHz");
+					AddComment(writer,headerFooter);
+					AddComment(writer,"Total raw callsign records processed in Canadian VE callsign database: " + veTotalRawRecordsProcessed);
+					AddComment(writer, "Total Canadian VE included callsign entries: " + veTotalRecordsIncluded);
+					AddComment(writer,headerFooter);
+				}
+
 				// write the N1MM call history header descriptor
+				AddComment(writer,headerFooter);
+				AddComment(writer,"The next entry defines the N1MM field descriptors for the included call data:");
+				AddComment(writer,headerFooter);
 				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
+				AddComment(writer,headerFooter);
+				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
+				AddComment(writer,headerFooter);
 
 				// write out all the entries int the big list of callsigns to include in call history file
 				for ( String listEntry : bigListOfCallsigns)
@@ -581,13 +604,17 @@ public class AmatCleaner
 
 				if (argumentValues.includeVECallHistory)
 				{
+					AddComment(writer,headerFooter);
+					AddComment(writer,veTotalRecordsIncluded + " Canadian VE callsign entries begin below:");
+					AddComment(writer,headerFooter);
+
 					// write out all the entries int the big VE list of callsigns to include in call history file
 					for (String listEntry : bigListOfVECallsigns)
 					{
 						writer.write(listEntry);
 					}
 					AddComment(writer, headerFooter);
-					AddComment(writer, "End of Canadian VE callsigns. Number of Canadian VE callsigns included above: " + veTotalRecords);
+					AddComment(writer, "End of Canadian VE callsigns. Number of Canadian VE callsigns included above: " + veTotalRecordsIncluded);
 					AddComment(writer, headerFooter);
 				}
 
@@ -630,6 +657,41 @@ public class AmatCleaner
 		out(headerFooter);
 		out("");
 		return (numErrors > 0) ? true : false;
+	}
+
+	private String ScrubFirstName(String firstName)
+	{
+		String[] fields;
+
+		// trim, uppercase and remove any period or comma, FFC data won't have a comma, but FE firstnames could
+		//firstName.trim().toUpperCase();
+		firstName = firstName.trim().replaceAll("[.,]","").toUpperCase();
+
+		// set first name to the longest first name grabbed from attentionLine
+		fields = firstName.split(" ", -1);
+
+		// if there are more than 3 parts just take the first two
+		if (fields.length > 2)
+		{
+			firstName = fields[0] + " " + fields[1];
+			fields = firstName.split(" ", -1);	// yeah lazy, removing the last element looks clunky from the code I looked up
+		}
+
+		// check for a single letter initial
+		if (fields.length == 2) // if two names grab the longest if one is only one letter
+		{
+			if (fields[0].length() == 1 || fields[1].length() == 1)
+			{
+				firstName = (fields[0].length() > fields[1].length()) ? fields[0] : fields[1];
+			}
+			else
+			{
+				// just take the first name if there are two names at this point
+				firstName = fields[0];
+			}
+		}
+
+		return firstName;
 	}
 
 	private void AddComment(BufferedWriter writer, String comment) throws IOException
