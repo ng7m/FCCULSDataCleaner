@@ -272,7 +272,6 @@ public class AmatCleaner
 		String record;
 		String splitBy = Pattern.quote("|");
 		String headerFooter = "========================================================================================";
-		int numErrors = 0;
 		String n1mmCallHistoryFileName = GetN1MMPotaCallHisotryFileName();
 		String[] fields;
 		String uniqueSystemIdentifier, licenseStatus, licenseClass, attentionLine;
@@ -470,8 +469,6 @@ public class AmatCleaner
 					File veAmateurDelimitedTxtFile = new File(Paths.get(veN1MMCallHistoryWorkingDirectory,"amateur_delim.txt").toString());
 					reader = new BufferedReader(new FileReader(veAmateurDelimitedTxtFile));
 
-					addRecord = false;
-
 					// skip the first header record
 					reader.readLine();
 					// the header looks like this:
@@ -504,9 +501,7 @@ public class AmatCleaner
 						}
 
 						// at this point if providence is empty, they will be excluded. callsign should never be empty at this point
-						addRecord = !callSign.isEmpty() && !providence.isEmpty();
-
-						if (addRecord)
+						if (!callSign.isEmpty() && !providence.isEmpty())
 						{
 							// exclude them if they only have the basic qualification set to 'A', if any other options are set, include them
 							if (qualA.equals("A") && qualB.isEmpty() && qualC.isEmpty() && qualD.isEmpty() && qualD.isEmpty())
@@ -531,12 +526,12 @@ public class AmatCleaner
 
 				// write out the header and other comments and then write out the callsign data
 				AddComment(writer, headerFooter);
-				AddComment(writer,"This file is intended to be used with N1MM as call history.");
-				AddComment(writer,"to resolve names and states during POTA activations.");
+				AddComment(writer,"This file is intended to be used with N1MM as call history to resolve");
+				AddComment(writer,"names and states during POTA activations.");
 				AddComment(writer,"This call history file would be compatible with any N1MM contest");
-				AddComment(writer,"that uses Name and Exch1.");
+				AddComment(writer,"that uses Name and Exch1 in the callsign entry window.");
 				AddComment(writer, headerFooter);
-				AddComment(writer,"Code to export FCC and VE callsign data written by Max NG7M (ng7m@arrl.net)");
+				AddComment(writer,"Code to export FCC and VE callsign data written by Max NG7M (ng7m@arrl.net).");
 				AddComment(writer,"Kudos to Ben (KI7KY) and Jon (K7CO) for data validation and performance testing.");
 				AddComment(writer,headerFooter);
 				AddComment(writer,"File created: " + GetDateTimeUTC());
@@ -617,8 +612,6 @@ public class AmatCleaner
 					AddComment(writer, "End of Canadian VE callsigns. Number of Canadian VE callsigns included above: " + veTotalRecordsIncluded);
 					AddComment(writer, headerFooter);
 				}
-
-
 			}
 		} catch(FileNotFoundException e)
 		{
@@ -653,10 +646,9 @@ public class AmatCleaner
 			}
 		}
 
-		//out("File : " + absoluteFile + " Finished Processing with: " + recordNum + " rows. Records removed due to errors: " + numErrors);
 		out(headerFooter);
 		out("");
-		return (numErrors > 0) ? true : false;
+		return true;
 	}
 
 	private String ScrubFirstName(String firstName)
