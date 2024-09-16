@@ -132,7 +132,7 @@ public class FCCULSDataCleaner
 					.help("Output Directory for N1MM call history file generation. Uses Temp Location if not specified.");
 
 			_argsParser.addArgument("-fccAmURL")
-					.type(String.class).setDefault("ftp://wirelessftp.fcc.gov/pub/uls/complete/l_amat.zip")
+					.type(String.class).setDefault("https://data.fcc.gov/download/pub/uls/complete/l_amat.zip")
 					.help("FCC URL to ULS Amateur Complete Zipped Data Download:");
 
 			_argsParser.addArgument("-veAmURL")

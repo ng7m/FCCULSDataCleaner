@@ -69,16 +69,33 @@ public class AmatCleaner
 
                 // reach out and download the file, make sure and set proxy jvm properties if
                 // running from a NAT based network, user must set env var proxy variables
-                out("Downloading: " + argumentValues.fccAmatuerLicenseCompleteURL);
-                out("Be Patient! File is over 100 megs...");
+                out("Attempting to download: " + argumentValues.fccAmatuerLicenseCompleteURL);
+                out("Be Patient.  This might take awhile depending on your bandwidth...");
 
-                if (CopyFTPURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString()))
-                {
-                    // if we made it here, we have a zip file that needs to be extracted
-                    unZipFile(workingDirectoryPath, zipFileName);
+				if (argumentValues.fccAmatuerLicenseCompleteURL.startsWith("http"))
+				{
+					if (CopyHTTPURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString()))
+					{
+						// if we made it here, we have a zip file that needs to be extracted
+						unZipFile(workingDirectoryPath, zipFileName);
 
-                    bSuccessful = true;
-                }
+						bSuccessful = true;
+					}
+				}
+				else if (argumentValues.fccAmatuerLicenseCompleteURL.startsWith("ftp")) {
+
+					if (CopyFTPURLtoFile(argumentValues.fccAmatuerLicenseCompleteURL, filePath.toString())) {
+						// if we made it here, we have a zip file that needs to be extracted
+						unZipFile(workingDirectoryPath, zipFileName);
+
+						bSuccessful = true;
+					}
+				}
+				else
+				{
+					out("Invalid file type requested! Previously downloaded files will be used if they exist.");
+					bSuccessful = false;
+				}
 			}
 			else
 			{
@@ -151,7 +168,7 @@ public class AmatCleaner
 									// reach out and download the file, make sure and set proxy jvm properties if
 									// running from a NAT based network, user must set env var proxy variables
 									out("Downloading: " + argumentValues.veAmatuerLicenseCompleteURL);
-									out("Be Patient! File is over 2 megs...");
+									out("Be Patient.  This might take awhile depending on your bandwidth...");
 
 									if (CopyHTTPURLtoFile(argumentValues.veAmatuerLicenseCompleteURL, filePath.toString()))
 									{
@@ -170,7 +187,8 @@ public class AmatCleaner
 				out("Processing Completed in: " + (System.currentTimeMillis() - startTime) / 1000 + " Seconds...");
 			}
 
-		out("Successful Processing = " + bSuccessful);
+		out("Processing: " + (bSuccessful ? "Successful" : "Unsuccessful"));
+
 	    out("Exiting...");
 
 		return bSuccessful;
@@ -528,10 +546,10 @@ public class AmatCleaner
 
 				// write out the header and other comments and then write out the callsign data
 				AddComment(writer, headerFooter);
-				AddComment(writer,"This file is intended to be used with N1MM as call history to resolve");
-				AddComment(writer,"names and states during POTA activations.");
-				AddComment(writer,"This call history file would be compatible with any N1MM contest");
-				AddComment(writer,"that uses Name and Exch1 in the callsign entry window.");
+				AddComment(writer,"This file is intended to be used with N1MM Logger++ as call history");
+				AddComment(writer,"to resolve names and states during POTA activations.");
+				AddComment(writer,"This call history file is compatible with any N1MM contest");
+				AddComment(writer,"that uses 'Name' and 'Exch1' in the callsign entry window.");
 				AddComment(writer, headerFooter);
 				AddComment(writer,"Code to export FCC and VE callsign data written by Max NG7M (ng7m@arrl.net).");
 				AddComment(writer,"Kudos to Ben (KI7KY) and Jon (K7CO) for data validation and performance testing.");
@@ -583,9 +601,12 @@ public class AmatCleaner
 
 				// write the N1MM call history header descriptor
 				AddComment(writer,headerFooter);
-				AddComment(writer,"The next entry defines the N1MM field descriptors for the included call data:");
+				AddComment(writer,"N1MM field descriptors are defined in the next line:");
 				AddComment(writer,headerFooter);
 				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
+				AddComment(writer,"The N1MM supported contest name is defined / described in the following lines:");
+				AddComment(writer,"The next line(s) will turn on call history lookup when you create a new POTA contest and load this file as call history.");
+				writer.write("# POTA\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
 				AddComment(writer,headerFooter);
 				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
 				AddComment(writer,headerFooter);
@@ -693,10 +714,11 @@ public class AmatCleaner
 		if (null != writer)
 		{
 			writer.write("# " + comment + "\r\n");
-			if (getConfiguration().verboseOutput)
-			{
-				out(comment);
-			}
+		}
+		// just a quick and dirty way to output comments in verbose mode
+		if (getConfiguration().verboseOutput)
+		{
+			out(comment);
 		}
 	}
 
