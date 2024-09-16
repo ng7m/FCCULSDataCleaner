@@ -602,10 +602,10 @@ public class AmatCleaner
 				// write the N1MM call history header descriptor
 				AddComment(writer,headerFooter);
 				AddComment(writer,"N1MM field descriptors are defined in the next line:");
-				AddComment(writer,headerFooter);
 				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
 				AddComment(writer,"The N1MM supported contest name is defined / described in the following lines:");
-				AddComment(writer,"The next line(s) will turn on call history lookup when you create a new POTA contest and load this file as call history.");
+				AddComment(writer,"The next line(s) will turn on call history lookup when you create a new POTA contest and");
+				AddComment(writer,"load this file as call history.");
 				writer.write("# POTA\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
 				AddComment(writer,headerFooter);
 				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
