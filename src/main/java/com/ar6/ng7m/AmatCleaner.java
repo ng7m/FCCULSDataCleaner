@@ -509,6 +509,10 @@ public class AmatCleaner
 								veBasicLicensesExcluded++;
 								addRecord = false;
 							}
+							else
+							{
+								addRecord = true;
+							}
 						}
 
 						if (addRecord)
