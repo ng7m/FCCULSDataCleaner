@@ -283,7 +283,6 @@ public class AmatCleaner
 		Date workingDate;
 		Calendar calendar = Calendar.getInstance();
 		Date today = new Date();
-		boolean licenseExpired;
 		List<String> bigListOfCallsigns = new ArrayList<>();
 		List<String> bigListOfVECallsigns = new ArrayList<>();
 
@@ -351,6 +350,7 @@ public class AmatCleaner
 				e.printStackTrace();
 			}
 
+			// open the main FCC EN.dat file that has the primary info,
 			reader = new BufferedReader(new FileReader(ENdatFile));
 
 			// now make sure we can create the output file
@@ -386,7 +386,6 @@ public class AmatCleaner
 						licenseClass = amHashMap.get(uniqueSystemIdentifier);
 
 						// check if the call is still active in the expiration windows
-						licenseExpired = false;
 						if (licenseClass.equals("G") ||
 								licenseClass.equals("A") ||
 								licenseClass.equals("E") ||
@@ -399,10 +398,8 @@ public class AmatCleaner
 								calendar.add(Calendar.DATE, -14);
 								workingDate = calendar.getTime();
 
-								licenseExpired = today.after(workingDate);
-								if (licenseExpired)
+								if (today.after(workingDate))
 								{
-									//out("Callsign: " + callSign + " License Expiration: " + workingDate.toString() + " License status: " + licenseStatus);
 									activeButExpired++;
 									continue;
 								}
@@ -471,6 +468,7 @@ public class AmatCleaner
 
 					// skip the first header record
 					reader.readLine();
+
 					// the header looks like this:
 					// callsign;first_name;surname;address_line;city;prov_cd;postal_code;qual_a;qual_b;qual_c;qual_d;qual_e;club_name;club_name_2;club_address;club_city;club_prov_cd;club_postal_code
 
