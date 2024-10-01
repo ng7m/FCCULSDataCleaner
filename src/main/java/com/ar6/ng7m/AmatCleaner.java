@@ -607,6 +607,11 @@ public class AmatCleaner
 				AddComment(writer,"The next line(s) will turn on call history lookup when you create a new POTA contest and");
 				AddComment(writer,"load this file as call history.");
 				writer.write("# POTA\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# POTA-ve3fp\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# DX\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# NAQPCW\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# NAQPSSB\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# QSOPARTY\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
 				AddComment(writer,headerFooter);
 				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
 				AddComment(writer,headerFooter);
