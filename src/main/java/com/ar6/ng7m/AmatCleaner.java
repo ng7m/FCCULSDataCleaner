@@ -377,17 +377,17 @@ public class AmatCleaner
 
 			if (includeAllLicenseClasses)
 			{
-				if (n1mmCallHistoryFileName.toLowerCase().endsWith(".txt"))
-				{
-					// this is a hack
-					n1mmCallHistoryFileName = n1mmCallHistoryFileName.substring(0,n1mmCallHistoryFileName.length()-4);
-					n1mmCallHistoryFileName = n1mmCallHistoryFileName+"-All-License-Classes" + ".txt";
-				}
-				else
-				{
-					n1mmCallHistoryFileName = n1mmCallHistoryFileName+"-All-License-Classes";
-				}
+				// set the full output directory based on which version we are generating
+				n1mmCallHistoryOutputDirectory += "\\All License Classes Included";
 			}
+			else
+			{
+				n1mmCallHistoryOutputDirectory += "\\Novice Technician Basic Excluded";
+			}
+
+			// make sure the additional directory path exists
+			ValidateOrCreateDirectory(n1mmCallHistoryOutputDirectory);
+
 			Path path = Paths.get(n1mmCallHistoryOutputDirectory, n1mmCallHistoryFileName);
 
 
@@ -617,8 +617,8 @@ public class AmatCleaner
 				AddComment(writer, "Excluded: " + activeButExpired + " active but expired or soon to expire");
 				AddComment(writer, "Excluded: " + notActiveCount + " not active calls");
 				AddComment(writer,headerFooter);
-				AddComment(writer,"Total raw callsign records processed in USA FCC callsign database: " + totalRecords);
-				AddComment(writer, "Total USA FCC included callsign entries: " + (noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer,"Total raw callsign records processed in FCC callsign database: " + totalRecords);
+				AddComment(writer, "Total FCC included callsign entries: " + (noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount + clubCalls));
 				AddComment(writer,headerFooter);
 
 				// add ve related comments and stats
@@ -665,7 +665,7 @@ public class AmatCleaner
 				writer.write("# NAQPSSB\r\n");
 				writer.write("# QSOPARTY\r\n");
 				AddComment(writer,headerFooter);
-				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
+				AddComment(writer,(noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " FCC callsign entries begin below:");
 				AddComment(writer,headerFooter);
 
 				// write out all the entries int the big list of callsigns to include in call history file
@@ -674,7 +674,7 @@ public class AmatCleaner
 					writer.write(listEntry);
 				}
 				AddComment(writer,headerFooter);
-				AddComment(writer, "End of USA FCC callsigns. Number of USA FCC callsigns included above: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer, "End of FCC callsigns. Number of callsigns included above: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
 				AddComment(writer,headerFooter);
 
 				if (argumentValues.includeVECallHistory)
@@ -1186,6 +1186,22 @@ public class AmatCleaner
 			out("URL: " + uri + " to File: " + file + " failed!" + exceptionCause);
 		}
 		return bSuccess;
+	}
+	private void ValidateOrCreateDirectory(String outputDestination)
+	{
+		boolean directoryExists = false;
+		// check to see if directory exists and create it if not
+		File file = new File(outputDestination);
+
+		if(file.isDirectory() && file.canWrite())
+		{
+			directoryExists = true;
+		}
+
+		if (!directoryExists)
+		{
+			file.mkdirs();
+		}
 	}
 
 
