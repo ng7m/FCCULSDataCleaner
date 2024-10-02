@@ -179,7 +179,11 @@ public class AmatCleaner
 							}
 						}	// if including ve call database
 
-						bSuccessful = CreateN1MMCallHistory();
+						bSuccessful = CreateN1MMCallHistory(false);	// create FCC general and above and VE HF privilege only call history
+						if (bSuccessful)
+						{
+							CreateN1MMCallHistory(true);	// include all license classes / different file name created
+						}
 					}
 				}	// if creating n1mm call hisotry
 
@@ -276,7 +280,7 @@ public class AmatCleaner
 		return (numErrors > 0) ? true : false;
 	}
 
-	private boolean CreateN1MMCallHistory()
+	private boolean CreateN1MMCallHistory(boolean includeAllLicenseClasses)
 	{
 		CmdLineArgs argumentValues = getConfiguration();
 		String outputDestinationPath = argumentValues.GetOutputDestination();
@@ -342,7 +346,7 @@ public class AmatCleaner
 
 			// read in the AM.dat file and create a hash table used to look up the license class
 			HashMap<String, String> amHashMap = new HashMap<>();
-			int generalClassCount = 0, advancedClassCount= 0, extraClassCount = 0;
+			int noviceClassCount = 0, technicianClassCount = 0, generalClassCount = 0, advancedClassCount= 0, extraClassCount = 0;
 			int clubCalls = 0, totalRecords = 0;
 			int allOtherLicenceClasses = 0;
 			int veTotalRecordsIncluded = 0, veBasicLicensesExcluded = 0, veClubCalls = 0, veTotalRawRecordsProcessed = 0;
@@ -371,8 +375,21 @@ public class AmatCleaner
 			// open the main FCC EN.dat file that has the primary info,
 			reader = new BufferedReader(new FileReader(ENdatFile));
 
-			// now make sure we can create the output file
+			if (includeAllLicenseClasses)
+			{
+				if (n1mmCallHistoryFileName.toLowerCase().endsWith(".txt"))
+				{
+					// this is a hack
+					n1mmCallHistoryFileName = n1mmCallHistoryFileName.substring(0,n1mmCallHistoryFileName.length()-4);
+					n1mmCallHistoryFileName = n1mmCallHistoryFileName+"-All-License-Classes" + ".txt";
+				}
+				else
+				{
+					n1mmCallHistoryFileName = n1mmCallHistoryFileName+"-All-License-Classes";
+				}
+			}
 			Path path = Paths.get(n1mmCallHistoryOutputDirectory, n1mmCallHistoryFileName);
+
 
 			if(!getConfiguration().readOnly)
 			{
@@ -428,6 +445,14 @@ public class AmatCleaner
 						{
 							switch (licenseClass)
 							{
+								case "N":
+									noviceClassCount++;
+									addRecord = includeAllLicenseClasses;
+									break;
+								case "T":
+									technicianClassCount++;
+									addRecord = includeAllLicenseClasses;
+									break;
 								case "G":
 									generalClassCount++;
 									addRecord = true;
@@ -520,7 +545,7 @@ public class AmatCleaner
 						if (!callSign.isEmpty() && !providence.isEmpty())
 						{
 							// exclude them if they only have the basic qualification set to 'A', if any other options are set, include them
-							if (qualA.equals("A") && qualB.isEmpty() && qualC.isEmpty() && qualD.isEmpty() && qualD.isEmpty())
+							if (!includeAllLicenseClasses && qualA.equals("A") && qualB.isEmpty() && qualC.isEmpty() && qualD.isEmpty() && qualD.isEmpty())
 							{
 								veBasicLicensesExcluded++;
 								addRecord = false;
@@ -562,22 +587,38 @@ public class AmatCleaner
 				AddComment(writer,headerFooter);
 				AddComment(writer,"US FCC call database statistics:");
 				AddComment(writer,headerFooter);
+				if (includeAllLicenseClasses)
+				{
+					AddComment(writer, "Included: " + noviceClassCount + " novice class calls");
+					AddComment(writer, "Included: " + technicianClassCount + " technician class calls");
+				}
 				AddComment(writer, "Included: " + generalClassCount + " general class calls");
 				AddComment(writer, "Included: " + advancedClassCount + " advanced class calls");
 				AddComment(writer, "Included: " + extraClassCount + " extra class calls");
 				AddComment(writer, "Included: " + clubCalls + " club calls");
-				AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount) +" general, advanced and extra class calls");
-				AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
+				if (!includeAllLicenseClasses)
+				{
+					AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount) + " general, advanced and extra class calls");
+					AddComment(writer, "Included: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, general, advanced and extra class calls");
+				}
+				else
+				{
+					AddComment(writer, "Included: " + (noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount) + " novice, technician, general, advanced and extra class calls");
+					AddComment(writer, "Included: " + (noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " club, novice, technician, general, advanced and extra class calls");
+
+				}
 				AddComment(writer,headerFooter);
 				AddComment(writer,"Excluded call statistics:");
 				AddComment(writer,headerFooter);
-				AddComment(writer, "Excluded: " + allOtherLicenceClasses + " other license classes / technician and novice");
+				if (!includeAllLicenseClasses)
+				{
+					AddComment(writer, "Excluded: " + (noviceClassCount + technicianClassCount) + " technician and novice calls");
+				}
 				AddComment(writer, "Excluded: " + activeButExpired + " active but expired or soon to expire");
 				AddComment(writer, "Excluded: " + notActiveCount + " not active calls");
-				AddComment(writer, "Excluded a total of: " + (notActiveCount + allOtherLicenceClasses) + " records");
 				AddComment(writer,headerFooter);
 				AddComment(writer,"Total raw callsign records processed in USA FCC callsign database: " + totalRecords);
-				AddComment(writer, "Total USA FCC included callsign entries: " + (generalClassCount + advancedClassCount + extraClassCount + clubCalls));
+				AddComment(writer, "Total USA FCC included callsign entries: " + (noviceClassCount + technicianClassCount + generalClassCount + advancedClassCount + extraClassCount + clubCalls));
 				AddComment(writer,headerFooter);
 
 				// add ve related comments and stats
@@ -586,32 +627,43 @@ public class AmatCleaner
 					AddComment(writer,headerFooter);
 					AddComment(writer,"VE Canadian call database statistics:");
 					AddComment(writer,headerFooter);
-					AddComment(writer,"Included: " + (veTotalRecordsIncluded - veClubCalls) + " individual licensee calls with privileges below 30 mHz");
+					if (!includeAllLicenseClasses)
+					{
+						AddComment(writer, "Included: " + (veTotalRecordsIncluded - veClubCalls) + " individual licensee calls with privileges below 30 mHz");
+					}
+					else
+					{
+						AddComment(writer,"Included: " + (veTotalRecordsIncluded - veClubCalls) + " individual licensee calls");
+					}
 					AddComment(writer,"Included: " + veClubCalls + " calls that appear to clubs");
 					AddComment(writer,"   Total: " + veTotalRecordsIncluded + " individual licensee and club calls");
 					AddComment(writer,headerFooter);
-					AddComment(writer,"Excluded call statistics:");
-					AddComment(writer,headerFooter);
-					AddComment(writer,"Excluded: " + veBasicLicensesExcluded + " calls with Basic qualification with only privileges above 30 mHz");
-					AddComment(writer,headerFooter);
-					AddComment(writer,"Total raw callsign records processed in Canadian VE callsign database: " + veTotalRawRecordsProcessed);
+					if (!includeAllLicenseClasses)
+					{
+						AddComment(writer,"Excluded call statistics:");
+						AddComment(writer,headerFooter);
+						AddComment(writer, "Excluded: " + veBasicLicensesExcluded + " calls with Basic qualification with only privileges above 30 mHz");
+						AddComment(writer, headerFooter);
+						AddComment(writer,"Total raw callsign records processed in Canadian VE callsign database: " + veTotalRawRecordsProcessed);
+					}
 					AddComment(writer, "Total Canadian VE included callsign entries: " + veTotalRecordsIncluded);
 					AddComment(writer,headerFooter);
+
 				}
 
 				// write the N1MM call history header descriptor
-				AddComment(writer,headerFooter);
-				AddComment(writer,"N1MM field descriptors are defined in the next line:");
+				AddComment(writer,"N1MM call history field descriptors are defined in the next line:");
 				writer.write("!!Order!!,Call,Name,Exch1\r\n"); // N1MM History File specific header to describe what each field is
-				AddComment(writer,"The N1MM supported contest name is defined / described in the following lines:");
-				AddComment(writer,"The next line(s) will turn on call history lookup when you create a new POTA contest and");
-				AddComment(writer,"load this file as call history.");
+				AddComment(writer,headerFooter);
+				AddComment(writer,"N1MM supported contest name(s)described in the following lines:");
+				AddComment(writer,"The next line(s) will turn on call 'N1MM history lookup' when you create a new contest");
+				AddComment(writer,"and load this file for the following contest short name(s):");
 				writer.write("# POTA\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
-				writer.write("# POTA-ve3fp\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
-				writer.write("# DX\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
-				writer.write("# NAQPCW\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
-				writer.write("# NAQPSSB\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
-				writer.write("# QSOPARTY\r\n");  // yes this is formatted just like a comment '#' based on the short n1mm contest name, using write here to make that point
+				writer.write("# POTA-ve3fp\r\n");
+				writer.write("# DX\r\n");
+				writer.write("# NAQPCW\r\n");
+				writer.write("# NAQPSSB\r\n");
+				writer.write("# QSOPARTY\r\n");
 				AddComment(writer,headerFooter);
 				AddComment(writer,(generalClassCount + advancedClassCount + extraClassCount + clubCalls) + " USA FCC callsign entries begin below:");
 				AddComment(writer,headerFooter);
@@ -683,7 +735,7 @@ public class AmatCleaner
 	{
 		String[] fields;
 
-		// trim, uppercase and remove any period or comma, FFC data won't have a comma, but FE firstnames could
+		// trim, uppercase and remove any period or comma, FFC data won't have a comma, but VE firstnames could
 		//firstName.trim().toUpperCase();
 		firstName = firstName.trim().replaceAll("[.,]","").toUpperCase();
 
